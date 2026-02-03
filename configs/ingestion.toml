@@ -1,0 +1,26 @@
+[general]
+log_level = "info"
+max_retries = 5
+retry_delay_ms = 1000
+
+[avalanche]
+# Mainnet C-Chain WebSocket endpoint
+websocket_url = "wss://api.avax.network/ext/bc/C/ws"
+# Alternative endpoints for redundancy
+fallback_urls = [
+    "wss://avalanche-c-chain.publicnode.com/ws",
+    "wss://avax.public-rpc.com/ext/bc/C/ws"
+]
+connection_timeout_ms = 5000
+ping_interval_sec = 30
+
+[redis]
+url = "redis://localhost:6379"
+connection_pool_size = 10
+queue_name = "transactions"
+batch_size = 100
+batch_timeout_ms = 1000
+
+[monitoring]
+metrics_port = 9000
+health_check_interval_sec = 30
