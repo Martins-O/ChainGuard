@@ -1,0 +1,30 @@
+[package]
+name = "chainGuard-ingestion"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+tokio = { version = "1.0", features = ["full"] }
+tokio-tungstenite = { version = "0.20", features = ["native-tls"] }
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+redis = { version = "0.23", features = ["tokio-comp", "json"] }
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+tracing-appender = "0.2"
+anyhow = "1.0"
+url = "2.4"
+futures-util = "0.3"
+futures = "0.3"
+serde_with = "3.0"
+thiserror = "1.0"
+backoff = { version = "0.4", features = ["tokio"] }
+prometheus = { version = "0.13", features = ["process"] }
+axum = "0.7"
+tower-http = { version = "0.5", features = ["cors", "trace"] }
+toml = "0.8"
+clap = { version = "4.4", features = ["derive"] }
+uuid = { version = "1.6", features = ["v4", "serde"] }
+chrono = { version = "0.4", features = ["serde"] }
+ethabi = "18.0"
+hex = "0.4"
