@@ -1,4 +1,4 @@
-const { Pool } = require('pg');
+const { MongoClient, ObjectId } = require('mongodb');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const winston = require('winston');
@@ -19,154 +19,67 @@ const logger = winston.createLogger({
 
 class Database {
   constructor() {
-    this.pool = null;
+    this.client = null;
+    this.db = null;
   }
 
   async initialize() {
     try {
-      const connectionString = process.env.DATABASE_URL || 
-        'postgresql://chainguard:chainguard_password@localhost:5432/chainguard';
-      
-      this.pool = new Pool({
-        connectionString,
-        max: 20,
-        idleTimeoutMillis: 30000,
-        connectionTimeoutMillis: 2000,
+      const mongoUrl = process.env.MONGODB_URL ||
+        'mongodb://chainguard:chainguard_password@localhost:27017/chainguard';
+
+      this.client = new MongoClient(mongoUrl, {
+        maxPoolSize: 20,
+        minPoolSize: 5,
+        maxIdleTimeMS: 30000,
+        serverSelectionTimeoutMS: 2000,
       });
 
-      // Test connection
-      const client = await this.pool.connect();
-      await client.query('SELECT NOW()');
-      client.release();
+      await this.client.connect();
+      this.db = this.client.db('chainguard');
 
-      // Create tables if they don't exist
-      await this.createTables();
-      
-      logger.info('Database connected successfully');
+      // Test connection
+      await this.db.command({ ping: 1 });
+
+      // Ensure indexes exist
+      await this.createIndexes();
+
+      logger.info('MongoDB connected successfully');
     } catch (error) {
-      logger.error('Failed to connect to database:', error);
+      logger.error('Failed to connect to MongoDB:', error);
       throw error;
     }
   }
 
-  async createTables() {
-    const createUsersTable = `
-      CREATE TABLE IF NOT EXISTS users (
-        id SERIAL PRIMARY KEY,
-        username VARCHAR(50) UNIQUE NOT NULL,
-        email VARCHAR(255) UNIQUE NOT NULL,
-        password_hash VARCHAR(255) NOT NULL,
-        role VARCHAR(20) DEFAULT 'user',
-        is_active BOOLEAN DEFAULT TRUE,
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-      );
-    `;
-
-    const createSubnetsTable = `
-      CREATE TABLE IF NOT EXISTS subnets (
-        id SERIAL PRIMARY KEY,
-        name VARCHAR(255) NOT NULL,
-        chain_id VARCHAR(100) UNIQUE NOT NULL,
-        rpc_url VARCHAR(500) NOT NULL,
-        websocket_url VARCHAR(500) NOT NULL,
-        description TEXT,
-        is_active BOOLEAN DEFAULT TRUE,
-        monitoring_enabled BOOLEAN DEFAULT TRUE,
-        created_by INTEGER REFERENCES users(id),
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-      );
-    `;
-
-    const createTransactionsTable = `
-      CREATE TABLE IF NOT EXISTS transactions (
-        id SERIAL PRIMARY KEY,
-        tx_hash VARCHAR(66) UNIQUE NOT NULL,
-        subnet_id INTEGER REFERENCES subnets(id),
-        block_number BIGINT NOT NULL,
-        transaction_index INTEGER NOT NULL,
-        from_address VARCHAR(42) NOT NULL,
-        to_address VARCHAR(42),
-        value VARCHAR(78) NOT NULL,
-        gas_used VARCHAR(78) NOT NULL,
-        gas_limit VARCHAR(78) NOT NULL,
-        gas_price VARCHAR(78),
-        transaction_data JSONB,
-        decoded_call JSONB,
-        logs JSONB,
-        status BOOLEAN NOT NULL,
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-      );
-    `;
-
-    const createThreatAnalysesTable = `
-      CREATE TABLE IF NOT EXISTS threat_analyses (
-        id SERIAL PRIMARY KEY,
-        tx_hash VARCHAR(66) UNIQUE NOT NULL,
-        subnet_id INTEGER REFERENCES subnets(id),
-        signature_score FLOAT,
-        anomaly_score FLOAT,
-        behavioral_score FLOAT,
-        final_score FLOAT NOT NULL,
-        threat_level VARCHAR(20) NOT NULL,
-        explanation TEXT,
-        raw_transaction JSONB,
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-      );
-    `;
-
-    const createAlertsTable = `
-      CREATE TABLE IF NOT EXISTS alerts (
-        id SERIAL PRIMARY KEY,
-        alert_id VARCHAR(36) UNIQUE NOT NULL,
-        tx_hash VARCHAR(66) NOT NULL,
-        subnet_id INTEGER REFERENCES subnets(id),
-        threat_score FLOAT NOT NULL,
-        threat_level VARCHAR(20) NOT NULL,
-        explanation TEXT,
-        transaction_data JSONB,
-        notification_channels JSONB,
-        notification_sent BOOLEAN DEFAULT FALSE,
-        acknowledged BOOLEAN DEFAULT FALSE,
-        false_positive BOOLEAN DEFAULT FALSE,
-        acknowledged_by INTEGER REFERENCES users(id),
-        acknowledged_at TIMESTAMP,
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-      );
-    `;
-
-    const createIndexes = `
-      CREATE INDEX IF NOT EXISTS idx_users_username ON users(username);
-      CREATE INDEX IF NOT EXISTS idx_users_email ON users(email);
-      CREATE INDEX IF NOT EXISTS idx_subnets_chain_id ON subnets(chain_id);
-      CREATE INDEX IF NOT EXISTS idx_transactions_tx_hash ON transactions(tx_hash);
-      CREATE INDEX IF NOT EXISTS idx_transactions_subnet_id ON transactions(subnet_id);
-      CREATE INDEX IF NOT EXISTS idx_transactions_from_address ON transactions(from_address);
-      CREATE INDEX IF NOT EXISTS idx_transactions_to_address ON transactions(to_address);
-      CREATE INDEX IF NOT EXISTS idx_transactions_block_number ON transactions(block_number);
-      CREATE INDEX IF NOT EXISTS idx_threat_analyses_tx_hash ON threat_analyses(tx_hash);
-      CREATE INDEX IF NOT EXISTS idx_threat_analyses_subnet_id ON threat_analyses(subnet_id);
-      CREATE INDEX IF NOT EXISTS idx_threat_analyses_threat_level ON threat_analyses(threat_level);
-      CREATE INDEX IF NOT EXISTS idx_alerts_tx_hash ON alerts(tx_hash);
-      CREATE INDEX IF NOT EXISTS idx_alerts_subnet_id ON alerts(subnet_id);
-      CREATE INDEX IF NOT EXISTS idx_alerts_threat_level ON alerts(threat_level);
-      CREATE INDEX IF NOT EXISTS idx_alerts_created_at ON alerts(created_at);
-    `;
-
+  async createIndexes() {
     try {
-      await this.pool.query(createUsersTable);
-      await this.pool.query(createSubnetsTable);
-      await this.pool.query(createTransactionsTable);
-      await this.pool.query(createThreatAnalysesTable);
-      await this.pool.query(createAlertsTable);
-      await this.pool.query(createIndexes);
-      logger.info('Database tables created/verified');
+      // Users indexes
+      await this.db.collection('users').createIndex({ username: 1 }, { unique: true });
+      await this.db.collection('users').createIndex({ email: 1 }, { unique: true });
+
+      // Subnets indexes
+      await this.db.collection('subnets').createIndex({ chainId: 1 }, { unique: true });
+      await this.db.collection('subnets').createIndex({ isActive: 1 });
+
+      // Transactions indexes
+      await this.db.collection('transactions').createIndex({ txHash: 1 }, { unique: true });
+      await this.db.collection('transactions').createIndex({ 'subnet.subnetId': 1, blockNumber: -1 });
+      await this.db.collection('transactions').createIndex({ fromAddress: 1 });
+      await this.db.collection('transactions').createIndex({ toAddress: 1 });
+
+      // Threat analyses indexes
+      await this.db.collection('threat_analyses').createIndex({ txHash: 1 }, { unique: true });
+      await this.db.collection('threat_analyses').createIndex({ 'subnet.subnetId': 1, threatLevel: 1 });
+
+      // Alerts indexes
+      await this.db.collection('alerts').createIndex({ alertId: 1 }, { unique: true });
+      await this.db.collection('alerts').createIndex({ txHash: 1 });
+      await this.db.collection('alerts').createIndex({ 'subnet.subnetId': 1, createdAt: -1 });
+      await this.db.collection('alerts').createIndex({ threatLevel: 1 });
+
+      logger.info('MongoDB indexes created/verified');
     } catch (error) {
-      logger.error('Failed to create database tables:', error);
-      throw error;
+      logger.warn('Some indexes may already exist:', error.message);
     }
   }
 
@@ -175,15 +88,25 @@ class Database {
     const { username, email, password, role = 'user' } = userData;
     const passwordHash = await bcrypt.hash(password, 10);
 
-    const query = `
-      INSERT INTO users (username, email, password_hash, role)
-      VALUES ($1, $2, $3, $4)
-      RETURNING id, username, email, role, created_at;
-    `;
-
     try {
-      const result = await this.pool.query(query, [username, email, passwordHash, role]);
-      return result.rows[0];
+      const result = await this.db.collection('users').insertOne({
+        username,
+        email,
+        passwordHash,
+        role,
+        isActive: true,
+        createdAt: new Date(),
+        updatedAt: new Date()
+      });
+
+      const user = await this.db.collection('users').findOne({ _id: result.insertedId });
+      return {
+        id: user._id.toString(),
+        username: user.username,
+        email: user.email,
+        role: user.role,
+        createdAt: user.createdAt
+      };
     } catch (error) {
       logger.error('Failed to create user:', error);
       throw error;
@@ -191,11 +114,20 @@ class Database {
   }
 
   async getUserByUsername(username) {
-    const query = 'SELECT * FROM users WHERE username = $1';
-
     try {
-      const result = await this.pool.query(query, [username]);
-      return result.rows[0] || null;
+      const user = await this.db.collection('users').findOne({ username });
+      if (!user) return null;
+
+      return {
+        id: user._id.toString(),
+        username: user.username,
+        email: user.email,
+        password_hash: user.passwordHash,
+        role: user.role,
+        is_active: user.isActive,
+        created_at: user.createdAt,
+        updated_at: user.updatedAt
+      };
     } catch (error) {
       logger.error('Failed to get user:', error);
       throw error;
@@ -218,15 +150,25 @@ class Database {
   async createSubnet(subnetData) {
     const { name, chainId, rpcUrl, websocketUrl, description, createdBy } = subnetData;
 
-    const query = `
-      INSERT INTO subnets (name, chain_id, rpc_url, websocket_url, description, created_by)
-      VALUES ($1, $2, $3, $4, $5, $6)
-      RETURNING *;
-    `;
-
     try {
-      const result = await this.pool.query(query, [name, chainId, rpcUrl, websocketUrl, description, createdBy]);
-      return result.rows[0];
+      const result = await this.db.collection('subnets').insertOne({
+        name,
+        chainId,
+        rpcUrl,
+        websocketUrl,
+        description: description || '',
+        isActive: true,
+        monitoringEnabled: true,
+        createdBy: createdBy ? {
+          userId: new ObjectId(createdBy),
+          username: 'api_user'  // Would need to fetch from users collection
+        } : null,
+        createdAt: new Date(),
+        updatedAt: new Date()
+      });
+
+      const subnet = await this.db.collection('subnets').findOne({ _id: result.insertedId });
+      return this._formatSubnet(subnet);
     } catch (error) {
       logger.error('Failed to create subnet:', error);
       throw error;
@@ -234,30 +176,24 @@ class Database {
   }
 
   async getSubnets(limit = 100, offset = 0, filters = {}) {
-    let query = 'SELECT * FROM subnets';
-    const params = [];
-    let paramIndex = 1;
-
-    const conditions = [];
-    if (filters.isActive !== undefined) {
-      conditions.push(`is_active = $${paramIndex++}`);
-      params.push(filters.isActive);
-    }
-    if (filters.monitoringEnabled !== undefined) {
-      conditions.push(`monitoring_enabled = $${paramIndex++}`);
-      params.push(filters.monitoringEnabled);
-    }
-
-    if (conditions.length > 0) {
-      query += ' WHERE ' + conditions.join(' AND ');
-    }
-
-    query += ` ORDER BY created_at DESC LIMIT $${paramIndex++} OFFSET $${paramIndex++}`;
-    params.push(limit, offset);
-
     try {
-      const result = await this.pool.query(query, params);
-      return result.rows;
+      const query = {};
+
+      if (filters.isActive !== undefined) {
+        query.isActive = filters.isActive;
+      }
+      if (filters.monitoringEnabled !== undefined) {
+        query.monitoringEnabled = filters.monitoringEnabled;
+      }
+
+      const subnets = await this.db.collection('subnets')
+        .find(query)
+        .sort({ createdAt: -1 })
+        .skip(offset)
+        .limit(limit)
+        .toArray();
+
+      return subnets.map(subnet => this._formatSubnet(subnet));
     } catch (error) {
       logger.error('Failed to get subnets:', error);
       throw error;
@@ -265,11 +201,9 @@ class Database {
   }
 
   async getSubnetById(id) {
-    const query = 'SELECT * FROM subnets WHERE id = $1';
-
     try {
-      const result = await this.pool.query(query, [id]);
-      return result.rows[0] || null;
+      const subnet = await this.db.collection('subnets').findOne({ _id: new ObjectId(id) });
+      return subnet ? this._formatSubnet(subnet) : null;
     } catch (error) {
       logger.error('Failed to get subnet:', error);
       throw error;
@@ -277,20 +211,23 @@ class Database {
   }
 
   async updateSubnet(id, updates) {
-    const fields = Object.keys(updates);
-    const values = Object.values(updates);
-    
-    const setClause = fields.map((field, index) => `${field} = $${index + 2}`).join(', ');
-    const query = `
-      UPDATE subnets 
-      SET ${setClause}, updated_at = CURRENT_TIMESTAMP 
-      WHERE id = $1 
-      RETURNING *;
-    `;
-
     try {
-      const result = await this.pool.query(query, [id, ...values]);
-      return result.rows[0];
+      // Convert snake_case to camelCase for MongoDB
+      const mongoUpdates = {};
+      if (updates.is_active !== undefined) mongoUpdates.isActive = updates.is_active;
+      if (updates.monitoring_enabled !== undefined) mongoUpdates.monitoringEnabled = updates.monitoring_enabled;
+      if (updates.name) mongoUpdates.name = updates.name;
+      if (updates.description) mongoUpdates.description = updates.description;
+
+      mongoUpdates.updatedAt = new Date();
+
+      const result = await this.db.collection('subnets').findOneAndUpdate(
+        { _id: new ObjectId(id) },
+        { $set: mongoUpdates },
+        { returnDocument: 'after' }
+      );
+
+      return result.value ? this._formatSubnet(result.value) : null;
     } catch (error) {
       logger.error('Failed to update subnet:', error);
       throw error;
@@ -298,11 +235,9 @@ class Database {
   }
 
   async deleteSubnet(id) {
-    const query = 'DELETE FROM subnets WHERE id = $1 RETURNING *';
-
     try {
-      const result = await this.pool.query(query, [id]);
-      return result.rows[0] || null;
+      const result = await this.db.collection('subnets').findOneAndDelete({ _id: new ObjectId(id) });
+      return result.value ? this._formatSubnet(result.value) : null;
     } catch (error) {
       logger.error('Failed to delete subnet:', error);
       throw error;
@@ -311,42 +246,36 @@ class Database {
 
   // Transaction management
   async getTransactions(subnetId, limit = 100, offset = 0, filters = {}) {
-    let query = 'SELECT * FROM transactions WHERE subnet_id = $1';
-    const params = [subnetId];
-    let paramIndex = 2;
-
-    const conditions = [];
-    if (filters.fromAddress) {
-      conditions.push(`from_address = $${paramIndex++}`);
-      params.push(filters.fromAddress);
-    }
-    if (filters.toAddress) {
-      conditions.push(`to_address = $${paramIndex++}`);
-      params.push(filters.toAddress);
-    }
-    if (filters.status !== undefined) {
-      conditions.push(`status = $${paramIndex++}`);
-      params.push(filters.status);
-    }
-    if (filters.startDate) {
-      conditions.push(`created_at >= $${paramIndex++}`);
-      params.push(filters.startDate);
-    }
-    if (filters.endDate) {
-      conditions.push(`created_at <= $${paramIndex++}`);
-      params.push(filters.endDate);
-    }
-
-    if (conditions.length > 0) {
-      query += ' AND ' + conditions.join(' AND ');
-    }
-
-    query += ` ORDER BY created_at DESC LIMIT $${paramIndex++} OFFSET $${paramIndex++}`;
-    params.push(limit, offset);
-
     try {
-      const result = await this.pool.query(query, params);
-      return result.rows;
+      const query = { 'subnet.subnetId': new ObjectId(subnetId) };
+
+      if (filters.fromAddress) {
+        query.fromAddress = filters.fromAddress;
+      }
+      if (filters.toAddress) {
+        query.toAddress = filters.toAddress;
+      }
+      if (filters.status !== undefined) {
+        query.status = filters.status;
+      }
+      if (filters.startDate || filters.endDate) {
+        query.createdAt = {};
+        if (filters.startDate) {
+          query.createdAt.$gte = new Date(filters.startDate);
+        }
+        if (filters.endDate) {
+          query.createdAt.$lte = new Date(filters.endDate);
+        }
+      }
+
+      const transactions = await this.db.collection('transactions')
+        .find(query)
+        .sort({ createdAt: -1 })
+        .skip(offset)
+        .limit(limit)
+        .toArray();
+
+      return transactions.map(tx => this._formatTransaction(tx));
     } catch (error) {
       logger.error('Failed to get transactions:', error);
       throw error;
@@ -354,11 +283,9 @@ class Database {
   }
 
   async getTransactionByHash(txHash) {
-    const query = 'SELECT * FROM transactions WHERE tx_hash = $1';
-
     try {
-      const result = await this.pool.query(query, [txHash]);
-      return result.rows[0] || null;
+      const transaction = await this.db.collection('transactions').findOne({ txHash });
+      return transaction ? this._formatTransaction(transaction) : null;
     } catch (error) {
       logger.error('Failed to get transaction:', error);
       throw error;
@@ -367,38 +294,33 @@ class Database {
 
   // Alert management
   async getAlerts(subnetId, limit = 100, offset = 0, filters = {}) {
-    let query = 'SELECT * FROM alerts WHERE subnet_id = $1';
-    const params = [subnetId];
-    let paramIndex = 2;
-
-    const conditions = [];
-    if (filters.threatLevel) {
-      conditions.push(`threat_level = $${paramIndex++}`);
-      params.push(filters.threatLevel);
-    }
-    if (filters.acknowledged !== undefined) {
-      conditions.push(`acknowledged = $${paramIndex++}`);
-      params.push(filters.acknowledged);
-    }
-    if (filters.startDate) {
-      conditions.push(`created_at >= $${paramIndex++}`);
-      params.push(filters.startDate);
-    }
-    if (filters.endDate) {
-      conditions.push(`created_at <= $${paramIndex++}`);
-      params.push(filters.endDate);
-    }
-
-    if (conditions.length > 0) {
-      query += ' AND ' + conditions.join(' AND ');
-    }
-
-    query += ` ORDER BY created_at DESC LIMIT $${paramIndex++} OFFSET $${paramIndex++}`;
-    params.push(limit, offset);
-
     try {
-      const result = await this.pool.query(query, params);
-      return result.rows;
+      const query = { 'subnet.subnetId': new ObjectId(subnetId) };
+
+      if (filters.threatLevel) {
+        query.threatLevel = filters.threatLevel;
+      }
+      if (filters.acknowledged !== undefined) {
+        query.acknowledged = filters.acknowledged;
+      }
+      if (filters.startDate || filters.endDate) {
+        query.createdAt = {};
+        if (filters.startDate) {
+          query.createdAt.$gte = new Date(filters.startDate);
+        }
+        if (filters.endDate) {
+          query.createdAt.$lte = new Date(filters.endDate);
+        }
+      }
+
+      const alerts = await this.db.collection('alerts')
+        .find(query)
+        .sort({ createdAt: -1 })
+        .skip(offset)
+        .limit(limit)
+        .toArray();
+
+      return alerts.map(alert => this._formatAlert(alert));
     } catch (error) {
       logger.error('Failed to get alerts:', error);
       throw error;
@@ -406,16 +328,24 @@ class Database {
   }
 
   async acknowledgeAlert(alertId, userId) {
-    const query = `
-      UPDATE alerts 
-      SET acknowledged = TRUE, acknowledged_by = $2, acknowledged_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP
-      WHERE id = $1 
-      RETURNING *;
-    `;
-
     try {
-      const result = await this.pool.query(query, [alertId, userId]);
-      return result.rows[0] || null;
+      const result = await this.db.collection('alerts').findOneAndUpdate(
+        { _id: new ObjectId(alertId) },
+        {
+          $set: {
+            acknowledged: true,
+            acknowledgedBy: {
+              userId: new ObjectId(userId),
+              username: 'api_user'
+            },
+            acknowledgedAt: new Date(),
+            updatedAt: new Date()
+          }
+        },
+        { returnDocument: 'after' }
+      );
+
+      return result.value ? this._formatAlert(result.value) : null;
     } catch (error) {
       logger.error('Failed to acknowledge alert:', error);
       throw error;
@@ -423,16 +353,25 @@ class Database {
   }
 
   async markFalsePositive(alertId, userId) {
-    const query = `
-      UPDATE alerts 
-      SET false_positive = TRUE, acknowledged = TRUE, acknowledged_by = $2, acknowledged_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP
-      WHERE id = $1 
-      RETURNING *;
-    `;
-
     try {
-      const result = await this.pool.query(query, [alertId, userId]);
-      return result.rows[0] || null;
+      const result = await this.db.collection('alerts').findOneAndUpdate(
+        { _id: new ObjectId(alertId) },
+        {
+          $set: {
+            falsePositive: true,
+            acknowledged: true,
+            acknowledgedBy: {
+              userId: new ObjectId(userId),
+              username: 'api_user'
+            },
+            acknowledgedAt: new Date(),
+            updatedAt: new Date()
+          }
+        },
+        { returnDocument: 'after' }
+      );
+
+      return result.value ? this._formatAlert(result.value) : null;
     } catch (error) {
       logger.error('Failed to mark alert as false positive:', error);
       throw error;
@@ -441,43 +380,153 @@ class Database {
 
   // Statistics
   async getSubnetStats(subnetId) {
-    const queries = {
-      totalTransactions: 'SELECT COUNT(*) as count FROM transactions WHERE subnet_id = $1',
-      successfulTransactions: 'SELECT COUNT(*) as count FROM transactions WHERE subnet_id = $1 AND status = true',
-      totalThreats: 'SELECT COUNT(*) as count FROM threat_analyses WHERE subnet_id = $1',
-      criticalThreats: "SELECT COUNT(*) as count FROM threat_analyses WHERE subnet_id = $1 AND threat_level = 'CRITICAL'",
-      highThreats: "SELECT COUNT(*) as count FROM threat_analyses WHERE subnet_id = $1 AND threat_level = 'HIGH'",
-      mediumThreats: "SELECT COUNT(*) as count FROM threat_analyses WHERE subnet_id = $1 AND threat_level = 'MEDIUM'",
-      lowThreats: "SELECT COUNT(*) as count FROM threat_analyses WHERE subnet_id = $1 AND threat_level = 'LOW'",
-      totalAlerts: 'SELECT COUNT(*) as count FROM alerts WHERE subnet_id = $1',
-      acknowledgedAlerts: 'SELECT COUNT(*) as count FROM alerts WHERE subnet_id = $1 AND acknowledged = true',
-      falsePositives: 'SELECT COUNT(*) as count FROM alerts WHERE subnet_id = $1 AND false_positive = true',
-      avgThreatScore: 'SELECT AVG(final_score) as avg FROM threat_analyses WHERE subnet_id = $1',
-      todayTransactions: "SELECT COUNT(*) as count FROM transactions WHERE subnet_id = $1 AND DATE(created_at) = CURRENT_DATE",
-      todayThreats: "SELECT COUNT(*) as count FROM threat_analyses WHERE subnet_id = $1 AND DATE(created_at) = CURRENT_DATE",
-      todayAlerts: "SELECT COUNT(*) as count FROM alerts WHERE subnet_id = $1 AND DATE(created_at) = CURRENT_DATE"
-    };
-
     try {
-      const results = await Promise.all(
-        Object.entries(queries).map(async ([key, query]) => {
-          const result = await this.pool.query(query, [subnetId]);
-          const value = result.rows[0].count;
-          return [key, key.includes('Score') ? parseFloat(value) : parseInt(value)];
-        })
-      );
+      const subnetObjectId = new ObjectId(subnetId);
 
-      return Object.fromEntries(results);
+      const [
+        totalTransactions,
+        successfulTransactions,
+        totalThreats,
+        threatsByLevel,
+        totalAlerts,
+        acknowledgedAlerts,
+        falsePositives,
+        avgThreatScore,
+        todayTransactions,
+        todayThreats,
+        todayAlerts
+      ] = await Promise.all([
+        this.db.collection('transactions').countDocuments({ 'subnet.subnetId': subnetObjectId }),
+        this.db.collection('transactions').countDocuments({ 'subnet.subnetId': subnetObjectId, status: true }),
+        this.db.collection('threat_analyses').countDocuments({ 'subnet.subnetId': subnetObjectId }),
+        this.db.collection('threat_analyses').aggregate([
+          { $match: { 'subnet.subnetId': subnetObjectId } },
+          { $group: { _id: '$threatLevel', count: { $sum: 1 } } }
+        ]).toArray(),
+        this.db.collection('alerts').countDocuments({ 'subnet.subnetId': subnetObjectId }),
+        this.db.collection('alerts').countDocuments({ 'subnet.subnetId': subnetObjectId, acknowledged: true }),
+        this.db.collection('alerts').countDocuments({ 'subnet.subnetId': subnetObjectId, falsePositive: true }),
+        this.db.collection('threat_analyses').aggregate([
+          { $match: { 'subnet.subnetId': subnetObjectId } },
+          { $group: { _id: null, avg: { $avg: '$scores.final' } } }
+        ]).toArray(),
+        this.db.collection('transactions').countDocuments({
+          'subnet.subnetId': subnetObjectId,
+          createdAt: {
+            $gte: new Date(new Date().setHours(0, 0, 0, 0))
+          }
+        }),
+        this.db.collection('threat_analyses').countDocuments({
+          'subnet.subnetId': subnetObjectId,
+          createdAt: {
+            $gte: new Date(new Date().setHours(0, 0, 0, 0))
+          }
+        }),
+        this.db.collection('alerts').countDocuments({
+          'subnet.subnetId': subnetObjectId,
+          createdAt: {
+            $gte: new Date(new Date().setHours(0, 0, 0, 0))
+          }
+        })
+      ]);
+
+      // Convert threat levels to individual counts
+      const threatLevels = {
+        criticalThreats: 0,
+        highThreats: 0,
+        mediumThreats: 0,
+        lowThreats: 0
+      };
+
+      threatsByLevel.forEach(item => {
+        if (item._id === 'CRITICAL') threatLevels.criticalThreats = item.count;
+        if (item._id === 'HIGH') threatLevels.highThreats = item.count;
+        if (item._id === 'MEDIUM') threatLevels.mediumThreats = item.count;
+        if (item._id === 'LOW') threatLevels.lowThreats = item.count;
+      });
+
+      return {
+        totalTransactions,
+        successfulTransactions,
+        totalThreats,
+        ...threatLevels,
+        totalAlerts,
+        acknowledgedAlerts,
+        falsePositives,
+        avgThreatScore: avgThreatScore[0]?.avg || 0,
+        todayTransactions,
+        todayThreats,
+        todayAlerts
+      };
     } catch (error) {
       logger.error('Failed to get subnet stats:', error);
       throw error;
     }
   }
 
+  // Formatting helpers (convert MongoDB documents to PostgreSQL-like format for compatibility)
+  _formatSubnet(subnet) {
+    return {
+      id: subnet._id.toString(),
+      name: subnet.name,
+      chain_id: subnet.chainId,
+      rpc_url: subnet.rpcUrl,
+      websocket_url: subnet.websocketUrl,
+      description: subnet.description,
+      is_active: subnet.isActive,
+      monitoring_enabled: subnet.monitoringEnabled,
+      created_by: subnet.createdBy?.userId?.toString() || null,
+      created_at: subnet.createdAt,
+      updated_at: subnet.updatedAt
+    };
+  }
+
+  _formatTransaction(tx) {
+    return {
+      id: tx._id.toString(),
+      tx_hash: tx.txHash,
+      subnet_id: tx.subnet?.subnetId?.toString() || null,
+      block_number: tx.blockNumber,
+      transaction_index: tx.transactionIndex,
+      from_address: tx.fromAddress,
+      to_address: tx.toAddress,
+      value: tx.value,
+      gas_used: tx.gasUsed,
+      gas_limit: tx.gasLimit,
+      gas_price: tx.gasPrice,
+      transaction_data: tx.transactionData,
+      decoded_call: tx.decodedCall,
+      logs: tx.logs,
+      status: tx.status,
+      created_at: tx.createdAt
+    };
+  }
+
+  _formatAlert(alert) {
+    return {
+      id: alert._id.toString(),
+      alert_id: alert.alertId,
+      tx_hash: alert.txHash,
+      subnet_id: alert.subnet?.subnetId?.toString() || null,
+      threat_score: alert.threatScore,
+      threat_level: alert.threatLevel,
+      explanation: alert.explanation,
+      transaction_data: alert.transactionData,
+      notification_channels: alert.notificationChannels,
+      notification_sent: alert.notificationSent,
+      acknowledged: alert.acknowledged,
+      false_positive: alert.falsePositive,
+      acknowledged_by: alert.acknowledgedBy?.userId?.toString() || null,
+      acknowledged_at: alert.acknowledgedAt,
+      created_at: alert.createdAt,
+      updated_at: alert.updatedAt
+    };
+  }
+
   async close() {
-    if (this.pool) {
-      await this.pool.end();
-      logger.info('Database connection closed');
+    if (this.client) {
+      await this.client.close();
+      logger.info('MongoDB connection closed');
     }
   }
 }
