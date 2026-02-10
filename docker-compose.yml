@@ -39,14 +39,14 @@ services:
       start_period: 30s
 
   mongodb:
-    image: mongo:7
+    image: mongo:latest
     container_name: chainguard-mongodb
     environment:
       MONGO_INITDB_ROOT_USERNAME: chainguard
       MONGO_INITDB_ROOT_PASSWORD: chainguard_password
       MONGO_INITDB_DATABASE: chainguard
     ports:
-      - "27017:27017"
+      - "27018:27017"
     volumes:
       - mongodb_data:/data/db
       - ./database/mongodb/init.js:/docker-entrypoint-initdb.d/init.js:ro

@@ -1,0 +1,44 @@
+# Python 3.13 Compatible Requirements
+# Use this if you have Python 3.13
+
+# Core FastAPI
+fastapi==0.109.0
+uvicorn[standard]==0.27.0
+pydantic==2.6.0
+python-multipart==0.0.9
+
+# Database - MongoDB (works on 3.13)
+motor==3.4.0
+pymongo==4.6.1
+
+# Database - PostgreSQL (legacy, can be removed)
+sqlalchemy==2.0.25
+asyncpg==0.29.0
+alembic==1.13.1
+
+# Redis
+redis[hiredis]==5.0.1
+
+# ML Libraries - Install from binary wheels only
+--only-binary=:all:
+scikit-learn>=1.4.0
+numpy>=1.26.0
+pandas>=2.2.0
+
+# TensorFlow for Python 3.13 (if available, otherwise skip for now)
+# tensorflow>=2.16.0  # Uncomment when Python 3.13 wheels are available
+
+# Auth
+python-jose[cryptography]==3.3.0
+passlib[bcrypt]==1.7.4
+
+# Utilities
+python-dotenv==1.0.0
+httpx==0.26.0
+prometheus-client==0.19.0
+structlog==24.1.0
+colorama==0.4.6
+
+# Web3
+web3==6.15.0
+eth-abi==5.0.0
