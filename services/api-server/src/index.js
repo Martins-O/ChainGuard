@@ -4,6 +4,9 @@ const express = require('express');
 const cors = require('cors');
 const helmet = require('helmet');
 const winston = require('winston');
+const swaggerUi = require('swagger-ui-express');
+const YAML = require('yamljs');
+const path = require('path');
 
 const Database = require('./database');
 const limits = require('./middleware/rateLimiting');
@@ -76,6 +79,25 @@ app.get('/health', async (req, res) => {
   }
 });
 
+// Swagger UI setup
+try {
+  const swaggerDocument = YAML.load(path.join(__dirname, '../../swagger.yaml'));
+  app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerDocument, {
+    customCss: '.swagger-ui .topbar { display: none }',
+    customSiteTitle: 'ChainGuard AI API Documentation',
+    customfavIcon: '/favicon.ico',
+    swaggerOptions: {
+      persistAuthorization: true,
+      displayRequestDuration: true,
+      filter: true,
+      tryItOutEnabled: true
+    }
+  }));
+  logger.info('Swagger UI available at /api-docs');
+} catch (error) {
+  logger.warn('Failed to load Swagger documentation:', error.message);
+}
+
 // API routes
 app.use('/auth', authRoutes);
 app.use('/subnets', subnetRoutes);
@@ -96,7 +118,8 @@ app.get('/', (req, res) => {
       transactions: '/transactions',
       alerts: '/alerts',
       stats: '/stats',
-      health: '/health'
+      health: '/health',
+      apiDocs: '/api-docs'
     }
   });
 });

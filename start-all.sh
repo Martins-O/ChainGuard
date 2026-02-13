@@ -80,8 +80,8 @@ fi
 echo ""
 
 # Start databases
-echo -e "${YELLOW}[3/7] Starting databases (Redis, Postgres, MongoDB)...${NC}"
-docker-compose up -d redis postgres mongodb
+echo -e "${YELLOW}[3/7] Starting databases (Redis, MongoDB)...${NC}"
+docker-compose up -d redis mongodb
 sleep 5
 echo -e "${GREEN}✓ Databases started${NC}"
 echo ""

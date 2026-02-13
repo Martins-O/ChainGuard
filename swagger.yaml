@@ -1,0 +1,1129 @@
+openapi: 3.0.3
+info:
+  title: ChainGuard AI API
+  description: |
+    REST API for ChainGuard AI security monitoring platform.
+    
+    ChainGuard AI provides comprehensive security monitoring for Avalanche blockchain networks through:
+    - Real-time Transaction Ingestion
+    - AI Threat Analysis
+    - Intelligent Alerting
+    - Complete Management Interface
+    
+    ## Authentication
+    Most endpoints require JWT authentication. Include the token in the Authorization header:
+    ```
+    Authorization: Bearer <your_jwt_token>
+    ```
+    
+    Get your token by logging in at `/auth/login`.
+    
+  version: 1.0.0
+  contact:
+    name: ChainGuard AI Support
+    email: support@chainguard.ai
+  license:
+    name: MIT
+    url: https://opensource.org/licenses/MIT
+
+servers:
+  - url: http://localhost:3000
+    description: Local development server
+  - url: https://api.chainguard.ai
+    description: Production server
+
+tags:
+  - name: Authentication
+    description: User authentication and authorization
+  - name: Subnets
+    description: Avalanche subnet management
+  - name: Transactions
+    description: Transaction monitoring and analysis
+  - name: Alerts
+    description: Security alert management
+  - name: Statistics
+    description: Analytics and statistics
+  - name: System
+    description: System health and information
+
+paths:
+  /health:
+    get:
+      tags:
+        - System
+      summary: Health check
+      description: Check the health status of the API server and database connection
+      operationId: healthCheck
+      responses:
+        '200':
+          description: Service is healthy
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HealthResponse'
+        '500':
+          description: Service is unhealthy
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /:
+    get:
+      tags:
+        - System
+      summary: API information
+      description: Get API server information and available endpoints
+      operationId: getApiInfo
+      responses:
+        '200':
+          description: API information
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  service:
+                    type: string
+                    example: ChainGuard API Server
+                  version:
+                    type: string
+                    example: 1.0.0
+                  status:
+                    type: string
+                    example: running
+                  timestamp:
+                    type: string
+                    format: date-time
+                  endpoints:
+                    type: object
+
+  /auth/login:
+    post:
+      tags:
+        - Authentication
+      summary: User login
+      description: Authenticate user and receive JWT token
+      operationId: login
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LoginRequest'
+      responses:
+        '200':
+          description: Login successful
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LoginResponse'
+        '401':
+          description: Invalid credentials
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '429':
+          description: Too many requests
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /auth/register:
+    post:
+      tags:
+        - Authentication
+      summary: User registration
+      description: Create a new user account
+      operationId: register
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RegisterRequest'
+      responses:
+        '201':
+          description: User created successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RegisterResponse'
+        '409':
+          description: Username or email already exists
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '400':
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ValidationErrorResponse'
+
+  /auth/verify:
+    post:
+      tags:
+        - Authentication
+      summary: Verify JWT token
+      description: Verify JWT token validity and get user information
+      operationId: verifyToken
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - token
+              properties:
+                token:
+                  type: string
+                  description: JWT token to verify
+      responses:
+        '200':
+          description: Token is valid
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  data:
+                    type: object
+                    properties:
+                      user:
+                        $ref: '#/components/schemas/User'
+                      token:
+                        type: string
+        '401':
+          description: Invalid or expired token
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /subnets:
+    get:
+      tags:
+        - Subnets
+      summary: List all subnets
+      description: Get a list of all configured subnets with optional filtering
+      operationId: listSubnets
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: limit
+          in: query
+          description: Maximum number of subnets to return
+          required: false
+          schema:
+            type: integer
+            default: 100
+            minimum: 1
+            maximum: 1000
+        - name: offset
+          in: query
+          description: Number of subnets to skip
+          required: false
+          schema:
+            type: integer
+            default: 0
+            minimum: 0
+        - name: isActive
+          in: query
+          description: Filter by active status
+          required: false
+          schema:
+            type: boolean
+        - name: monitoringEnabled
+          in: query
+          description: Filter by monitoring status
+          required: false
+          schema:
+            type: boolean
+      responses:
+        '200':
+          description: List of subnets
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SubnetListResponse'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+    post:
+      tags:
+        - Subnets
+      summary: Create subnet
+      description: Create a new subnet for monitoring (admin only)
+      operationId: createSubnet
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateSubnetRequest'
+      responses:
+        '201':
+          description: Subnet created successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SubnetResponse'
+        '400':
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ValidationErrorResponse'
+        '401':
+          description: Unauthorized
+        '403':
+          description: Forbidden (admin only)
+        '409':
+          description: Subnet with chain ID already exists
+
+  /subnets/{id}:
+    get:
+      tags:
+        - Subnets
+      summary: Get subnet by ID
+      description: Get detailed information about a specific subnet
+      operationId: getSubnetById
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: Subnet ID
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Subnet details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SubnetResponse'
+        '400':
+          description: Invalid subnet ID
+        '404':
+          description: Subnet not found
+        '401':
+          description: Unauthorized
+
+    patch:
+      tags:
+        - Subnets
+      summary: Update subnet
+      description: Update subnet configuration (admin only)
+      operationId: updateSubnet
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: Subnet ID
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateSubnetRequest'
+      responses:
+        '200':
+          description: Subnet updated successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SubnetResponse'
+        '400':
+          description: Validation error
+        '401':
+          description: Unauthorized
+        '403':
+          description: Forbidden (admin only)
+        '404':
+          description: Subnet not found
+
+    delete:
+      tags:
+        - Subnets
+      summary: Delete subnet
+      description: Delete a subnet from monitoring (admin only)
+      operationId: deleteSubnet
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: Subnet ID
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Subnet deleted successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SubnetResponse'
+        '400':
+          description: Invalid subnet ID
+        '401':
+          description: Unauthorized
+        '403':
+          description: Forbidden (admin only)
+        '404':
+          description: Subnet not found
+
+  /subnets/{id}/transactions:
+    get:
+      tags:
+        - Transactions
+      summary: Get subnet transactions
+      description: Get transactions for a specific subnet with filtering and pagination
+      operationId: getSubnetTransactions
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: Subnet ID
+          schema:
+            type: integer
+        - name: limit
+          in: query
+          description: Maximum number of transactions to return
+          required: false
+          schema:
+            type: integer
+            default: 100
+            minimum: 1
+            maximum: 1000
+        - name: offset
+          in: query
+          description: Number of transactions to skip
+          required: false
+          schema:
+            type: integer
+            default: 0
+            minimum: 0
+        - name: fromAddress
+          in: query
+          description: Filter by sender address
+          required: false
+          schema:
+            type: string
+        - name: toAddress
+          in: query
+          description: Filter by recipient address
+          required: false
+          schema:
+            type: string
+        - name: status
+          in: query
+          description: Filter by transaction status (true for success, false for failure)
+          required: false
+          schema:
+            type: boolean
+        - name: startDate
+          in: query
+          description: Filter transactions from this date (ISO 8601)
+          required: false
+          schema:
+            type: string
+            format: date-time
+        - name: endDate
+          in: query
+          description: Filter transactions until this date (ISO 8601)
+          required: false
+          schema:
+            type: string
+            format: date-time
+      responses:
+        '200':
+          description: List of transactions
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TransactionListResponse'
+        '400':
+          description: Invalid subnet ID
+        '401':
+          description: Unauthorized
+        '404':
+          description: Subnet not found
+
+  /transactions/{hash}:
+    get:
+      tags:
+        - Transactions
+      summary: Get transaction by hash
+      description: Get detailed information about a specific transaction
+      operationId: getTransactionByHash
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: hash
+          in: path
+          required: true
+          description: Transaction hash (0x-prefixed hex string)
+          schema:
+            type: string
+            pattern: '^0x[a-fA-F0-9]{64}$'
+      responses:
+        '200':
+          description: Transaction details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TransactionResponse'
+        '400':
+          description: Invalid transaction hash format
+        '401':
+          description: Unauthorized
+        '404':
+          description: Transaction not found
+
+  /subnets/{id}/alerts:
+    get:
+      tags:
+        - Alerts
+      summary: Get subnet alerts
+      description: Get security alerts for a specific subnet with filtering
+      operationId: getSubnetAlerts
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: Subnet ID
+          schema:
+            type: integer
+        - name: limit
+          in: query
+          description: Maximum number of alerts to return
+          required: false
+          schema:
+            type: integer
+            default: 100
+            minimum: 1
+            maximum: 1000
+        - name: offset
+          in: query
+          description: Number of alerts to skip
+          required: false
+          schema:
+            type: integer
+            default: 0
+            minimum: 0
+        - name: threatLevel
+          in: query
+          description: Filter by threat level
+          required: false
+          schema:
+            $ref: '#/components/schemas/ThreatLevel'
+        - name: acknowledged
+          in: query
+          description: Filter by acknowledgment status
+          required: false
+          schema:
+            type: boolean
+        - name: startDate
+          in: query
+          description: Filter alerts from this date (ISO 8601)
+          required: false
+          schema:
+            type: string
+            format: date-time
+        - name: endDate
+          in: query
+          description: Filter alerts until this date (ISO 8601)
+          required: false
+          schema:
+            type: string
+            format: date-time
+      responses:
+        '200':
+          description: List of alerts
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AlertListResponse'
+        '400':
+          description: Invalid subnet ID
+        '401':
+          description: Unauthorized
+        '404':
+          description: Subnet not found
+
+  /alerts/{id}/acknowledge:
+    patch:
+      tags:
+        - Alerts
+      summary: Acknowledge alert
+      description: Mark an alert as acknowledged
+      operationId: acknowledgeAlert
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: Alert ID
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Alert acknowledged successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AlertResponse'
+        '400':
+          description: Invalid alert ID
+        '401':
+          description: Unauthorized
+        '404':
+          description: Alert not found
+
+  /alerts/{id}/false-positive:
+    post:
+      tags:
+        - Alerts
+      summary: Mark alert as false positive
+      description: Mark an alert as a false positive
+      operationId: markFalsePositive
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: Alert ID
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Alert marked as false positive
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AlertResponse'
+        '400':
+          description: Invalid alert ID
+        '401':
+          description: Unauthorized
+        '404':
+          description: Alert not found
+
+  /subnets/{id}/stats:
+    get:
+      tags:
+        - Statistics
+      summary: Get subnet statistics
+      description: Get comprehensive statistics for a specific subnet
+      operationId: getSubnetStats
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: Subnet ID
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Subnet statistics
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StatsResponse'
+        '400':
+          description: Invalid subnet ID
+        '401':
+          description: Unauthorized
+        '404':
+          description: Subnet not found
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: JWT token obtained from /auth/login
+
+  schemas:
+    HealthResponse:
+      type: object
+      properties:
+        status:
+          type: string
+          example: healthy
+        timestamp:
+          type: string
+          format: date-time
+        services:
+          type: object
+          properties:
+            database:
+              type: string
+              example: connected
+            api:
+              type: string
+              example: running
+
+    ErrorResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: false
+        error:
+          type: string
+          example: Error message description
+
+    ValidationErrorResponse:
+      allOf:
+        - $ref: '#/components/schemas/ErrorResponse'
+        - type: object
+          properties:
+            details:
+              type: array
+              items:
+                type: object
+                properties:
+                  field:
+                    type: string
+                  message:
+                    type: string
+
+    LoginRequest:
+      type: object
+      required:
+        - username
+        - password
+      properties:
+        username:
+          type: string
+          example: admin
+        password:
+          type: string
+          format: password
+          example: admin123
+
+    LoginResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: true
+        data:
+          type: object
+          properties:
+            token:
+              type: string
+              description: JWT token for authentication
+              example: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+            user:
+              $ref: '#/components/schemas/User'
+
+    RegisterRequest:
+      type: object
+      required:
+        - username
+        - email
+        - password
+      properties:
+        username:
+          type: string
+          minLength: 3
+          maxLength: 50
+          example: newuser
+        email:
+          type: string
+          format: email
+          example: user@example.com
+        password:
+          type: string
+          format: password
+          minLength: 8
+          example: securepassword123
+        role:
+          type: string
+          enum: [user, admin]
+          default: user
+          example: user
+
+    RegisterResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: true
+        data:
+          type: object
+          properties:
+            token:
+              type: string
+            user:
+              $ref: '#/components/schemas/User'
+
+    User:
+      type: object
+      properties:
+        id:
+          type: string
+          example: "507f1f77bcf86cd799439011"
+        username:
+          type: string
+          example: admin
+        email:
+          type: string
+          example: admin@chainguard.local
+        role:
+          type: string
+          enum: [user, admin]
+          example: admin
+
+    CreateSubnetRequest:
+      type: object
+      required:
+        - name
+        - chainId
+        - rpcUrl
+        - websocketUrl
+      properties:
+        name:
+          type: string
+          example: Avalanche C-Chain
+        chainId:
+          type: string
+          example: "43114"
+        rpcUrl:
+          type: string
+          format: uri
+          example: https://api.avax.network/ext/bc/C/rpc
+        websocketUrl:
+          type: string
+          format: uri
+          example: wss://api.avax.network/ext/bc/C/ws
+        description:
+          type: string
+          example: Avalanche Mainnet C-Chain
+
+    UpdateSubnetRequest:
+      type: object
+      properties:
+        name:
+          type: string
+        rpcUrl:
+          type: string
+          format: uri
+        websocketUrl:
+          type: string
+          format: uri
+        description:
+          type: string
+        isActive:
+          type: boolean
+        monitoringEnabled:
+          type: boolean
+
+    Subnet:
+      type: object
+      properties:
+        id:
+          type: string
+          example: "507f1f77bcf86cd799439011"
+        name:
+          type: string
+          example: Avalanche C-Chain
+        chain_id:
+          type: string
+          example: "43114"
+        rpc_url:
+          type: string
+          example: https://api.avax.network/ext/bc/C/rpc
+        websocket_url:
+          type: string
+          example: wss://api.avax.network/ext/bc/C/ws
+        description:
+          type: string
+          nullable: true
+        is_active:
+          type: boolean
+          example: true
+        monitoring_enabled:
+          type: boolean
+          example: true
+        created_by:
+          type: string
+          nullable: true
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+
+    SubnetResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: true
+        data:
+          $ref: '#/components/schemas/Subnet'
+
+    SubnetListResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: true
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/Subnet'
+        pagination:
+          $ref: '#/components/schemas/Pagination'
+
+    Transaction:
+      type: object
+      properties:
+        id:
+          type: string
+        tx_hash:
+          type: string
+          example: "0xabcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890"
+        subnet_id:
+          type: string
+        block_number:
+          type: integer
+          example: 12345678
+        transaction_index:
+          type: integer
+        from_address:
+          type: string
+          example: "0x742d35Cc6474e40A2c5a7D8B6c8A8d9A1c2D3e4F"
+        to_address:
+          type: string
+          example: "0x1234567890123456789012345678901234567890"
+        value:
+          type: string
+          example: "1000000000000000000"
+        gas_used:
+          type: string
+          example: "21000"
+        gas_limit:
+          type: string
+          example: "21000"
+        gas_price:
+          type: string
+        status:
+          type: boolean
+          example: true
+        transaction_data:
+          type: object
+        decoded_call:
+          type: object
+          nullable: true
+        logs:
+          type: array
+          items:
+            type: object
+        created_at:
+          type: string
+          format: date-time
+
+    TransactionResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: true
+        data:
+          $ref: '#/components/schemas/Transaction'
+
+    TransactionListResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: true
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/Transaction'
+        pagination:
+          $ref: '#/components/schemas/Pagination'
+
+    ThreatLevel:
+      type: string
+      enum: [LOW, MEDIUM, HIGH, CRITICAL]
+      example: HIGH
+
+    Alert:
+      type: object
+      properties:
+        id:
+          type: string
+        alert_id:
+          type: string
+        tx_hash:
+          type: string
+        subnet_id:
+          type: string
+        threat_score:
+          type: number
+          minimum: 0
+          maximum: 100
+          example: 85
+        threat_level:
+          $ref: '#/components/schemas/ThreatLevel'
+        explanation:
+          type: string
+        transaction_data:
+          type: object
+        notification_channels:
+          type: array
+          items:
+            type: string
+          example: [slack, email]
+        notification_sent:
+          type: boolean
+        acknowledged:
+          type: boolean
+        false_positive:
+          type: boolean
+        acknowledged_by:
+          type: string
+          nullable: true
+        acknowledged_at:
+          type: string
+          format: date-time
+          nullable: true
+        created_at:
+          type: string
+          format: date-time
+
+    AlertResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: true
+        data:
+          $ref: '#/components/schemas/Alert'
+
+    AlertListResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: true
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/Alert'
+        pagination:
+          $ref: '#/components/schemas/Pagination'
+
+    Statistics:
+      type: object
+      properties:
+        totalTransactions:
+          type: integer
+          example: 1234567
+        totalAlerts:
+          type: integer
+          example: 1234
+        criticalAlerts:
+          type: integer
+          example: 12
+        highAlerts:
+          type: integer
+          example: 45
+        mediumAlerts:
+          type: integer
+          example: 234
+        lowAlerts:
+          type: integer
+          example: 943
+        acknowledgedAlerts:
+          type: integer
+          example: 1100
+        falsePositives:
+          type: integer
+          example: 50
+        avgThreatScore:
+          type: number
+          example: 35.5
+        transactionsToday:
+          type: integer
+          example: 12345
+        alertsToday:
+          type: integer
+          example: 23
+        uptime:
+          type: string
+          example: "99.9%"
+        lastAnalysis:
+          type: string
+          format: date-time
+
+    StatsResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: true
+        data:
+          type: object
+          properties:
+            subnet:
+              type: object
+              properties:
+                id:
+                  type: string
+                name:
+                  type: string
+                chainId:
+                  type: string
+            statistics:
+              $ref: '#/components/schemas/Statistics'
+
+    Pagination:
+      type: object
+      properties:
+        limit:
+          type: integer
+          example: 100
+        offset:
+          type: integer
+          example: 0
+        total:
+          type: integer
+          example: 250

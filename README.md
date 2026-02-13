@@ -23,9 +23,9 @@ ChainGuard AI provides comprehensive security monitoring for Avalanche blockchai
                               ▼                        ▼
 ┌─────────────────┐    ┌──────────────────┐    ┌─────────────────┐
 │                 │────│   AI Engine     │────│                 │
-│   PostgreSQL   │    │   (Python)      │    │ Alert Service  │
-│   & MongoDB    │────│                  │────│  (Node.js)     │
-│   Database     │    │  • Signature    │    │  • Slack       │
+│   MongoDB       │    │   (Python)      │    │ Alert Service  │
+│   Database      │────│                  │────│  (Node.js)     │
+│                 │    │  • Signature    │    │  • Slack       │
 └─────────────────┘    │  • Anomaly      │    │  • Email       │
                               │  • Behavioral  │    │  • SMS         │
                               └──────────────────┘    └─────────────────┘
@@ -66,81 +66,285 @@ ChainGuard AI provides comprehensive security monitoring for Avalanche blockchai
 - RESTful design with pagination
 
 ### 🗄️ Scalable Database
-- **PostgreSQL** with optimized schema (Relational data)
-- **MongoDB** for flexible document storage (User profiles, alerts)
+- **MongoDB** for flexible document storage (Users, subnets, transactions, alerts)
 - Comprehensive indexing strategy
-- Automated migrations
+- Automated collection and index creation
 
 ## 🚀 Quick Start
 
 ### Prerequisites
-- Docker & Docker Compose
-- Git
-- 4GB+ RAM (for all services)
 
-### One-Command Setup
+Before starting, ensure you have the following installed:
 
-The easiest way to start all services (API, AI Engine, Alert Service, Databases) is using the provided helper script:
+- **Docker** (20.10+) and **Docker Compose** (2.0+)
+- **Node.js** (18+) and **npm** (9+)
+- **Python** (3.10+) with `pip` and `venv`
+- **Rust** (1.70+) with `cargo` (for ingestion service)
+- **Git**
+- **4GB+ RAM** (for all services)
+- **10GB+ free disk space**
+
+Verify installations:
+```bash
+docker --version
+docker-compose --version
+node --version
+python3 --version
+cargo --version
+```
+
+### Complete Setup Guide
+
+#### Step 1: Clone and Navigate
 
 ```bash
 # Clone the repository
 git clone <repository-url>
-cd chainGuard
+cd ChainGuard
+```
 
-# Start all backend services
+#### Step 2: Environment Configuration
+
+Create a `.env` file in the project root (or use the one created by `start-all.sh`):
+
+```bash
+# If .env doesn't exist, create it
+cat > .env << 'EOF'
+# Database Connection
+MONGODB_URL=mongodb://chainguard:chainguard_password@localhost:27018/chainguard?authSource=admin
+REDIS_URL=redis://localhost:6379
+
+# JWT Secret (CHANGE IN PRODUCTION!)
+JWT_SECRET=chainguard_dev_secret_change_in_production
+
+# AI Engine Configuration
+THREAT_THRESHOLD=70
+MODEL_PATH=./models
+
+# Service Ports
+API_PORT=3000
+AI_ENGINE_PORT=8000
+ALERT_SERVICE_PORT=3001
+INGESTION_PORT=9000
+
+# Optional: Notification Services (leave empty if not using)
+SLACK_WEBHOOK_URL=
+DISCORD_WEBHOOK_URL=
+SENDGRID_API_KEY=
+SMTP_HOST=
+SMTP_PORT=
+SMTP_USER=
+SMTP_PASS=
+TWILIO_ACCOUNT_SID=
+TWILIO_AUTH_TOKEN=
+TWILIO_PHONE_NUMBER=
+ALERT_EMAIL_RECIPIENTS=
+SMS_RECIPIENTS=
+EMAIL_FROM=
+EOF
+```
+
+#### Step 3: Start All Backend Services
+
+**Option A: Using the Helper Script (Recommended)**
+
+The `start-all.sh` script automates the entire setup:
+
+```bash
+# Make script executable
+chmod +x start-all.sh
+
+# Start all services
 ./start-all.sh
 ```
 
-> **Note**: This script handles Docker Compose setup, dependency installation, and service startup.
+This script will:
+1. Check prerequisites
+2. Create `.env` if missing
+3. Start databases (MongoDB, Redis) via Docker
+4. Initialize MongoDB indexes
+5. Install dependencies for all services
+6. Start API Server, AI Engine, and Alert Service
+7. Verify all services are running
 
-### Start Frontend Dashboard
+**Option B: Using Docker Compose (All Services)**
+
+```bash
+# Start all services with Docker Compose
+docker-compose up -d
+
+# Or start only core services first
+docker-compose up -d mongodb redis
+
+# Wait for databases to be ready (30 seconds)
+sleep 30
+
+# Start application services
+docker-compose up -d api-server ai-engine alert-service
+```
+
+**Option C: Manual Service-by-Service Setup**
+
+1. **Start Databases:**
+```bash
+docker-compose up -d mongodb redis
+```
+
+2. **Wait for databases to initialize:**
+```bash
+# Check MongoDB
+docker-compose exec mongodb mongosh --eval "db.adminCommand('ping')"
+
+# Check Redis
+docker-compose exec redis redis-cli ping
+```
+
+3. **Install and Start API Server:**
+```bash
+cd services/api-server
+npm install
+npm run dev
+# Runs on http://localhost:3000
+```
+
+4. **Install and Start AI Engine:**
+```bash
+cd services/ai-engine
+python3 -m venv venv
+source venv/bin/activate  # On Windows: venv\Scripts\activate
+pip install -r requirements.txt
+uvicorn main:app --host 0.0.0.0 --port 8000 --reload
+# Runs on http://localhost:8000
+```
+
+5. **Install and Start Alert Service:**
+```bash
+cd services/alert-service
+npm install
+npm run dev
+# Runs on http://localhost:3001
+```
+
+#### Step 4: Start Frontend Dashboard
+
+In a new terminal:
 
 ```bash
 cd frontend
+
+# Install dependencies (first time only)
 npm install
+
+# Create .env file for frontend
+echo "VITE_API_URL=http://localhost:3000" > .env
+
+# Start development server
 npm run dev
 ```
 
-### Start Ingestion Service
+The frontend will be available at `http://localhost:5173`
 
-The Rust ingestion service must be started separately:
+#### Step 5: Start Ingestion Service (Optional)
+
+The Rust ingestion service connects to Avalanche networks:
 
 ```bash
 cd services/ingestion
+
+# Install Rust dependencies (first time only)
+cargo build
+
+# Run the service
 cargo run
+
+# Or run in release mode for better performance
+cargo run --release
 ```
 
-### Manual Setup
+The ingestion service will be available at `http://localhost:9000`
 
-1. **Environment Configuration**
+#### Step 6: Verify All Services
+
+Check that all services are running:
+
 ```bash
-cp .env.example .env
-# Edit .env with your API keys and configurations
+# Check Docker containers
+docker-compose ps
+
+# Check service health endpoints
+curl http://localhost:3000/health  # API Server
+curl http://localhost:8000/health  # AI Engine
+curl http://localhost:3001/health  # Alert Service
+curl http://localhost:9000/health  # Ingestion Service
 ```
 
-2. **Start Services**
+Expected output: All services should return `{"status": "healthy"}` or similar.
+
+### Service URLs
+
+Once all services are running, access them at:
+
+- 🌐 **API Server**: `http://localhost:3000`
+  - Health: `http://localhost:3000/health`
+  - API Info: `http://localhost:3000/`
+  
+- 🧠 **AI Engine**: `http://localhost:8000`
+  - Health: `http://localhost:8000/health`
+  - API Docs: `http://localhost:8000/docs`
+  - Metrics: `http://localhost:8000/metrics`
+  
+- 🚨 **Alert Service**: `http://localhost:3001`
+  - Health: `http://localhost:3001/health`
+  - Stats: `http://localhost:3001/stats`
+  
+- 📊 **Ingestion Service**: `http://localhost:9000`
+  - Health: `http://localhost:9000/health`
+  - Metrics: `http://localhost:9000/metrics`
+  
+- 🎨 **Frontend Dashboard**: `http://localhost:5173`
+  - Login: `http://localhost:5173/login`
+  - Dashboard: `http://localhost:5173/dashboard`
+
+- 🗄️ **Databases**:
+  - PostgreSQL: `localhost:5432`
+  - MongoDB: `localhost:27018`
+  - Redis: `localhost:6379`
+  - Mongo Express (if monitoring profile): `http://localhost:8081`
+  - Swagger UI: `http://localhost:3000/api-docs`
+
+### Default Login Credentials
+
+- **Username**: `admin`
+- **Password**: `admin123`
+
+⚠️ **SECURITY WARNING**: Change the default password immediately after first login!
+
+### Stopping Services
+
+**If using start-all.sh:**
 ```bash
-# Start core services
-docker-compose up -d postgres mongodb redis
-
-# Or with monitoring
-docker-compose --profile monitoring up -d
-
-# Or production setup
-docker-compose --profile production up -d
+./stop-all.sh
 ```
 
-3. **Access Services**
-- 🌐 API Server: `http://localhost:3000`
-- 🧠 AI Engine: `http://localhost:8000`
-- 🚨 Alert Service: `http://localhost:3001`
-- 📊 Ingestion Metrics: `http://localhost:9000`
+**If using Docker Compose:**
+```bash
+# Stop all services
+docker-compose down
 
-### Default Login
-- Username: `admin`
-- Password: `admin123`
+# Stop and remove volumes (WARNING: deletes data)
+docker-compose down -v
+```
 
-⚠️ **Change default password immediately after first login!**
+**If running services manually:**
+- Press `Ctrl+C` in each terminal
+- Or find and kill processes:
+```bash
+lsof -ti:3000 | xargs kill -9  # API Server
+lsof -ti:8000 | xargs kill -9  # AI Engine
+lsof -ti:3001 | xargs kill -9  # Alert Service
+lsof -ti:9000 | xargs kill -9  # Ingestion Service
+lsof -ti:5173 | xargs kill -9  # Frontend
+```
 
 ## 📋 Service Details
 
@@ -164,17 +368,12 @@ docker-compose --profile production up -d
 - **Features**: REST API, JWT auth, subnet management
 - **Docs**: Built-in OpenAPI documentation
 
-### 5️⃣ PostgreSQL Database
-- **Port**: 5432
-- **Features**: Schema migrations, optimized indexing
-- **Connection**: `postgresql://chainguard:chainguard_password@localhost:5432/chainguard`
-
-### 6️⃣ MongoDB Database
+### 5️⃣ MongoDB Database
 - **Port**: 27018 (remapped from 27017 to avoid conflicts)
 - **Features**: Document storage for users and alerts
 - **Connection**: `mongodb://chainguard:chainguard_password@localhost:27018/chainguard?authSource=admin`
 
-### 7️⃣ Frontend Dashboard
+### 6️⃣ Frontend Dashboard
 - **Port**: 5173 (default Vite port)
 - **Features**: Real-time dashboard, user management
 - **Tech Stack**: React, Vite, TailwindCSS
@@ -187,7 +386,6 @@ Key configuration options in `.env`:
 
 ```bash
 # Database
-DATABASE_URL=postgresql://chainguard:chainguard_password@localhost:5432/chainguard
 MONGODB_URL=mongodb://chainguard:chainguard_password@localhost:27018/chainguard?authSource=admin
 
 # AI Engine

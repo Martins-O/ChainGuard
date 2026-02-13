@@ -25,59 +25,40 @@ class Database {
 
   async initialize() {
     try {
-<<<<<<< HEAD
-      const connectionString = process.env.DATABASE_URL || 
-        'mongodb://chainguard:chainguard_password@localhost:27017/chainguard?authSource=admin';
-      
-      this.client = new MongoClient(connectionString, {
-        maxPoolSize: 20,
-        serverSelectionTimeoutMS: 5000,
-=======
       const mongoUrl = process.env.MONGODB_URL ||
-        'mongodb://chainguard:chainguard_password@localhost:27017/chainguard';
+        'mongodb://chainguard:chainguard_password@localhost:27018/chainguard?authSource=admin';
 
       this.client = new MongoClient(mongoUrl, {
         maxPoolSize: 20,
         minPoolSize: 5,
         maxIdleTimeMS: 30000,
-        serverSelectionTimeoutMS: 2000,
->>>>>>> cef979a9d3c0b7abcc524caf7fa6fdbb5feeaded
+        serverSelectionTimeoutMS: 5000,
       });
 
       await this.client.connect();
       this.db = this.client.db('chainguard');
 
       // Test connection
-<<<<<<< HEAD
-      await this.db.admin().ping();
+      await this.db.command({ ping: 1 });
 
       // Create collections and indexes
       await this.createCollections();
       
-      logger.info('Database connected successfully');
-=======
-      await this.db.command({ ping: 1 });
-
-      // Ensure indexes exist
-      await this.createIndexes();
-
       logger.info('MongoDB connected successfully');
->>>>>>> cef979a9d3c0b7abcc524caf7fa6fdbb5feeaded
     } catch (error) {
       logger.error('Failed to connect to MongoDB:', error);
       throw error;
     }
   }
 
-<<<<<<< HEAD
   async createCollections() {
     try {
       // Create collections if they don't exist
       const collections = ['users', 'subnets', 'transactions', 'threat_analyses', 'alerts', 'alert_logs'];
       
       for (const collectionName of collections) {
-        const collections = await this.db.listCollections({ name: collectionName }).toArray();
-        if (collections.length === 0) {
+        const existingCollections = await this.db.listCollections({ name: collectionName }).toArray();
+        if (existingCollections.length === 0) {
           await this.db.createCollection(collectionName);
           logger.info(`Created collection: ${collectionName}`);
         }
@@ -155,39 +136,7 @@ class Database {
 
       logger.info('Indexes created successfully');
     } catch (error) {
-      logger.error('Failed to create indexes:', error);
-      throw error;
-=======
-  async createIndexes() {
-    try {
-      // Users indexes
-      await this.db.collection('users').createIndex({ username: 1 }, { unique: true });
-      await this.db.collection('users').createIndex({ email: 1 }, { unique: true });
-
-      // Subnets indexes
-      await this.db.collection('subnets').createIndex({ chainId: 1 }, { unique: true });
-      await this.db.collection('subnets').createIndex({ isActive: 1 });
-
-      // Transactions indexes
-      await this.db.collection('transactions').createIndex({ txHash: 1 }, { unique: true });
-      await this.db.collection('transactions').createIndex({ 'subnet.subnetId': 1, blockNumber: -1 });
-      await this.db.collection('transactions').createIndex({ fromAddress: 1 });
-      await this.db.collection('transactions').createIndex({ toAddress: 1 });
-
-      // Threat analyses indexes
-      await this.db.collection('threat_analyses').createIndex({ txHash: 1 }, { unique: true });
-      await this.db.collection('threat_analyses').createIndex({ 'subnet.subnetId': 1, threatLevel: 1 });
-
-      // Alerts indexes
-      await this.db.collection('alerts').createIndex({ alertId: 1 }, { unique: true });
-      await this.db.collection('alerts').createIndex({ txHash: 1 });
-      await this.db.collection('alerts').createIndex({ 'subnet.subnetId': 1, createdAt: -1 });
-      await this.db.collection('alerts').createIndex({ threatLevel: 1 });
-
-      logger.info('MongoDB indexes created/verified');
-    } catch (error) {
       logger.warn('Some indexes may already exist:', error.message);
->>>>>>> cef979a9d3c0b7abcc524caf7fa6fdbb5feeaded
     }
   }
 
@@ -222,19 +171,11 @@ class Database {
       const result = await this.db.collection('users').insertOne({
         username,
         email,
-<<<<<<< HEAD
         password_hash: passwordHash,
         role,
         is_active: true,
         created_at: new Date(),
         updated_at: new Date()
-=======
-        passwordHash,
-        role,
-        isActive: true,
-        createdAt: new Date(),
-        updatedAt: new Date()
->>>>>>> cef979a9d3c0b7abcc524caf7fa6fdbb5feeaded
       });
 
       const user = await this.db.collection('users').findOne({ _id: result.insertedId });
@@ -243,11 +184,7 @@ class Database {
         username: user.username,
         email: user.email,
         role: user.role,
-<<<<<<< HEAD
         created_at: user.created_at
-=======
-        createdAt: user.createdAt
->>>>>>> cef979a9d3c0b7abcc524caf7fa6fdbb5feeaded
       };
     } catch (error) {
       logger.error('Failed to create user:', error);
@@ -259,28 +196,16 @@ class Database {
     try {
       const user = await this.db.collection('users').findOne({ username });
       if (!user) return null;
-<<<<<<< HEAD
-      
-=======
 
->>>>>>> cef979a9d3c0b7abcc524caf7fa6fdbb5feeaded
       return {
         id: user._id.toString(),
         username: user.username,
         email: user.email,
-<<<<<<< HEAD
         password_hash: user.password_hash,
         role: user.role,
         is_active: user.is_active,
         created_at: user.created_at,
         updated_at: user.updated_at
-=======
-        password_hash: user.passwordHash,
-        role: user.role,
-        is_active: user.isActive,
-        created_at: user.createdAt,
-        updated_at: user.updatedAt
->>>>>>> cef979a9d3c0b7abcc524caf7fa6fdbb5feeaded
       };
     } catch (error) {
       logger.error('Failed to get user:', error);
@@ -391,11 +316,7 @@ class Database {
   async getSubnetById(id) {
     try {
       const subnet = await this.db.collection('subnets').findOne({ _id: new ObjectId(id) });
-<<<<<<< HEAD
       return subnet ? this.formatSubnet(subnet) : null;
-=======
-      return subnet ? this._formatSubnet(subnet) : null;
->>>>>>> cef979a9d3c0b7abcc524caf7fa6fdbb5feeaded
     } catch (error) {
       logger.error('Failed to get subnet:', error);
       return null;
@@ -404,7 +325,6 @@ class Database {
 
   async updateSubnet(id, updates) {
     try {
-<<<<<<< HEAD
       const updateDoc = { ...updates, updated_at: new Date() };
       
       // Convert field names from camelCase to snake_case if needed
@@ -422,24 +342,6 @@ class Database {
 
       const subnet = await this.db.collection('subnets').findOne({ _id: new ObjectId(id) });
       return subnet ? this.formatSubnet(subnet) : null;
-=======
-      // Convert snake_case to camelCase for MongoDB
-      const mongoUpdates = {};
-      if (updates.is_active !== undefined) mongoUpdates.isActive = updates.is_active;
-      if (updates.monitoring_enabled !== undefined) mongoUpdates.monitoringEnabled = updates.monitoring_enabled;
-      if (updates.name) mongoUpdates.name = updates.name;
-      if (updates.description) mongoUpdates.description = updates.description;
-
-      mongoUpdates.updatedAt = new Date();
-
-      const result = await this.db.collection('subnets').findOneAndUpdate(
-        { _id: new ObjectId(id) },
-        { $set: mongoUpdates },
-        { returnDocument: 'after' }
-      );
-
-      return result.value ? this._formatSubnet(result.value) : null;
->>>>>>> cef979a9d3c0b7abcc524caf7fa6fdbb5feeaded
     } catch (error) {
       logger.error('Failed to update subnet:', error);
       throw error;
@@ -448,16 +350,11 @@ class Database {
 
   async deleteSubnet(id) {
     try {
-<<<<<<< HEAD
       const subnet = await this.db.collection('subnets').findOne({ _id: new ObjectId(id) });
       if (!subnet) return null;
 
       await this.db.collection('subnets').deleteOne({ _id: new ObjectId(id) });
       return this.formatSubnet(subnet);
-=======
-      const result = await this.db.collection('subnets').findOneAndDelete({ _id: new ObjectId(id) });
-      return result.value ? this._formatSubnet(result.value) : null;
->>>>>>> cef979a9d3c0b7abcc524caf7fa6fdbb5feeaded
     } catch (error) {
       logger.error('Failed to delete subnet:', error);
       throw error;
@@ -491,35 +388,16 @@ class Database {
       }
       if (filters.toAddress) {
         query.to_address = filters.toAddress;
-=======
-      const query = { 'subnet.subnetId': new ObjectId(subnetId) };
-
-      if (filters.fromAddress) {
-        query.fromAddress = filters.fromAddress;
-      }
-      if (filters.toAddress) {
-        query.toAddress = filters.toAddress;
->>>>>>> cef979a9d3c0b7abcc524caf7fa6fdbb5feeaded
       }
       if (filters.status !== undefined) {
         query.status = filters.status;
       }
-<<<<<<< HEAD
       if (filters.startDate) {
         query.created_at = { ...query.created_at, $gte: new Date(filters.startDate) };
       }
       if (filters.endDate) {
         query.created_at = { ...query.created_at, $lte: new Date(filters.endDate) };
-=======
-      if (filters.startDate || filters.endDate) {
-        query.createdAt = {};
-        if (filters.startDate) {
-          query.createdAt.$gte = new Date(filters.startDate);
-        }
-        if (filters.endDate) {
-          query.createdAt.$lte = new Date(filters.endDate);
-        }
->>>>>>> cef979a9d3c0b7abcc524caf7fa6fdbb5feeaded
+      }
       }
 
       const transactions = await this.db.collection('transactions')
