@@ -37,6 +37,45 @@ services:
       retries: 5
       start_period: 30s
 
+  mongodb:
+    image: mongo:latest
+    container_name: chainguard-mongodb
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: chainguard
+      MONGO_INITDB_ROOT_PASSWORD: chainguard_password
+      MONGO_INITDB_DATABASE: chainguard
+    ports:
+      - "27018:27017"
+    volumes:
+      - mongodb_data:/data/db
+      - ./database/mongodb/init.js:/docker-entrypoint-initdb.d/init.js:ro
+    networks:
+      - chainguard
+    healthcheck:
+      test: echo 'db.runCommand("ping").ok' | mongosh localhost:27017/chainguard --quiet
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
+    restart: unless-stopped
+
+  mongo-express:
+    image: mongo-express:latest
+    container_name: chainguard-mongo-express
+    environment:
+      ME_CONFIG_MONGODB_URL: mongodb://chainguard:chainguard_password@mongodb:27017/
+      ME_CONFIG_BASICAUTH: false
+    ports:
+      - "8081:8081"
+    depends_on:
+      mongodb:
+        condition: service_healthy
+    networks:
+      - chainguard
+    restart: unless-stopped
+    profiles:
+      - monitoring
+
   ingestion:
     build: 
       context: ./services/ingestion
@@ -69,14 +108,18 @@ services:
       dockerfile: Dockerfile
     container_name: chainguard-ai-engine
     environment:
-      - DATABASE_URL=mongodb://chainguard:chainguard_password@mongodb:27017/chainguard?authSource=admin
+      - DATABASE_URL=postgresql://chainguard:chainguard_password@postgres:5432/chainguard
+      - MONGODB_URL=mongodb://chainguard:chainguard_password@mongodb:27017/chainguard
       - REDIS_URL=redis://redis:6379
       - THREAT_THRESHOLD=70
       - PYTHONPATH=/app
       - LOG_LEVEL=INFO
+      - MODEL_PATH=/app/models
     ports:
       - "8000:8000"
     depends_on:
+      postgres:
+        condition: service_healthy
       mongodb:
         condition: service_healthy
       redis:
@@ -100,7 +143,8 @@ services:
       dockerfile: Dockerfile
     container_name: chainguard-alert-service
     environment:
-      - DATABASE_URL=mongodb://chainguard:chainguard_password@mongodb:27017/chainguard?authSource=admin
+      - DATABASE_URL=postgresql://chainguard:chainguard_password@postgres:5432/chainguard
+      - MONGODB_URL=mongodb://chainguard:chainguard_password@mongodb:27017/chainguard
       - REDIS_URL=redis://redis:6379
       - PORT=3001
       - NODE_ENV=production
@@ -120,6 +164,8 @@ services:
       - SMS_RECIPIENTS=${SMS_RECIPIENTS}
       - EMAIL_FROM=${EMAIL_FROM}
     depends_on:
+      postgres:
+        condition: service_healthy
       mongodb:
         condition: service_healthy
       redis:
@@ -143,7 +189,8 @@ services:
       dockerfile: Dockerfile
     container_name: chainguard-api-server
     environment:
-      - DATABASE_URL=mongodb://chainguard:chainguard_password@mongodb:27017/chainguard?authSource=admin
+      - DATABASE_URL=postgresql://chainguard:chainguard_password@postgres:5432/chainguard
+      - MONGODB_URL=mongodb://chainguard:chainguard_password@mongodb:27017/chainguard
       - JWT_SECRET=${JWT_SECRET:-your_jwt_secret_here_change_in_production}
       - PORT=3000
       - NODE_ENV=production
@@ -151,6 +198,8 @@ services:
     ports:
       - "3000:3000"
     depends_on:
+      postgres:
+        condition: service_healthy
       mongodb:
         condition: service_healthy
     volumes:
@@ -230,6 +279,8 @@ services:
       - monitoring
 
 volumes:
+  postgres_data:
+    driver: local
   mongodb_data:
     driver: local
   redis_data:

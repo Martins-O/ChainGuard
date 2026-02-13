@@ -14,7 +14,6 @@ ChainGuard AI provides comprehensive security monitoring for Avalanche blockchai
 
 ## 🏗️ Architecture
 
-```
 ┌─────────────────┐    ┌──────────────────┐    ┌─────────────────┐
 │  Avalanche      │    │                  │    │                 │
 │  Subnet RPC/Web │────│ Rust Ingestion   │────│   Redis Queue   │
@@ -24,9 +23,9 @@ ChainGuard AI provides comprehensive security monitoring for Avalanche blockchai
                               ▼                        ▼
 ┌─────────────────┐    ┌──────────────────┐    ┌─────────────────┐
 │                 │────│   AI Engine     │────│                 │
-│   MongoDB      │    │   (Python)      │    │ Alert Service  │
-│   Database     │────│                  │────│  (Node.js)     │
-│                 │    │  • Signature    │    │  • Slack       │
+│   PostgreSQL   │    │   (Python)      │    │ Alert Service  │
+│   & MongoDB    │────│                  │────│  (Node.js)     │
+│   Database     │    │  • Signature    │    │  • Slack       │
 └─────────────────┘    │  • Anomaly      │    │  • Email       │
                               │  • Behavioral  │    │  • SMS         │
                               └──────────────────┘    └─────────────────┘
@@ -35,10 +34,9 @@ ChainGuard AI provides comprehensive security monitoring for Avalanche blockchai
                               ┌──────────────────┐    ┌─────────────────┐
                               │                 │    │                 │
                               │   API Server    │────│  Web Dashboard │
-                              │  (Node.js)      │    │  (Frontend)     │
+                              │  (Node.js)      │    │  (Vite/React)   │
                               │                 │    │                 │
                               └──────────────────┘    └─────────────────┘
-```
 
 ## ⚡ Features
 
@@ -68,9 +66,9 @@ ChainGuard AI provides comprehensive security monitoring for Avalanche blockchai
 - RESTful design with pagination
 
 ### 🗄️ Scalable Database
-- MongoDB with optimized collections and indexes
+- **PostgreSQL** with optimized schema (Relational data)
+- **MongoDB** for flexible document storage (User profiles, alerts)
 - Comprehensive indexing strategy
-- JSONB for flexible data storage
 - Automated migrations
 
 ## 🚀 Quick Start
@@ -82,14 +80,34 @@ ChainGuard AI provides comprehensive security monitoring for Avalanche blockchai
 
 ### One-Command Setup
 
+The easiest way to start all services (API, AI Engine, Alert Service, Databases) is using the provided helper script:
+
 ```bash
 # Clone the repository
 git clone <repository-url>
 cd chainGuard
 
-# Run development setup
-chmod +x scripts/dev-setup.sh
-./scripts/dev-setup.sh
+# Start all backend services
+./start-all.sh
+```
+
+> **Note**: This script handles Docker Compose setup, dependency installation, and service startup.
+
+### Start Frontend Dashboard
+
+```bash
+cd frontend
+npm install
+npm run dev
+```
+
+### Start Ingestion Service
+
+The Rust ingestion service must be started separately:
+
+```bash
+cd services/ingestion
+cargo run
 ```
 
 ### Manual Setup
@@ -103,7 +121,7 @@ cp .env.example .env
 2. **Start Services**
 ```bash
 # Start core services
-docker-compose up -d
+docker-compose up -d postgres mongodb redis
 
 # Or with monitoring
 docker-compose --profile monitoring up -d
@@ -146,10 +164,20 @@ docker-compose --profile production up -d
 - **Features**: REST API, JWT auth, subnet management
 - **Docs**: Built-in OpenAPI documentation
 
-### 5️⃣ MongoDB Database
-- **Port**: 27017
-- **Features**: Collections, optimized indexing, document storage
-- **Connection**: `mongodb://chainguard:chainguard_password@localhost:27017/chainguard?authSource=admin`
+### 5️⃣ PostgreSQL Database
+- **Port**: 5432
+- **Features**: Schema migrations, optimized indexing
+- **Connection**: `postgresql://chainguard:chainguard_password@localhost:5432/chainguard`
+
+### 6️⃣ MongoDB Database
+- **Port**: 27018 (remapped from 27017 to avoid conflicts)
+- **Features**: Document storage for users and alerts
+- **Connection**: `mongodb://chainguard:chainguard_password@localhost:27018/chainguard?authSource=admin`
+
+### 7️⃣ Frontend Dashboard
+- **Port**: 5173 (default Vite port)
+- **Features**: Real-time dashboard, user management
+- **Tech Stack**: React, Vite, TailwindCSS
 
 ## 🔧 Configuration
 
@@ -159,7 +187,8 @@ Key configuration options in `.env`:
 
 ```bash
 # Database
-DATABASE_URL=mongodb://chainguard:chainguard_password@localhost:27017/chainguard?authSource=admin
+DATABASE_URL=postgresql://chainguard:chainguard_password@localhost:5432/chainguard
+MONGODB_URL=mongodb://chainguard:chainguard_password@localhost:27018/chainguard?authSource=admin
 
 # AI Engine
 THREAT_THRESHOLD=70          # Alert trigger threshold
@@ -399,6 +428,15 @@ docker-compose -f docker-compose.prod.yml up -d
 ## 🔍 Troubleshooting
 
 ### Common Issues
+
+**MongoDB Connection Issues**
+```bash
+# Check if MongoDB is running on the custom port (27018)
+docker ps | grep mongo
+
+# Test connection manually
+mongosh "mongodb://chainguard:chainguard_password@localhost:27018/chainguard?authSource=admin"
+```
 
 **Services not starting**
 ```bash

@@ -1,152 +1,318 @@
-from pymongo import MongoClient
-from pymongo.errors import ConnectionFailure, DuplicateKeyError
+"""
+MongoDB Database Module for ChainGuard AI Engine
+Replaces SQLAlchemy with Motor (async MongoDB driver)
+"""
+from motor.motor_asyncio import AsyncIOMotorClient
+from pymongo import IndexModel, ASCENDING, DESCENDING
 from datetime import datetime, timezone
+from typing import Optional, Dict, Any, List
 import os
-from typing import Optional, Dict, Any
+import logging
 
-DATABASE_URL = os.getenv("DATABASE_URL", "mongodb://chainguard:chainguard_password@localhost:27017/chainguard?authSource=admin")
+logger = logging.getLogger(__name__)
+
+# MongoDB connection URL
+MONGODB_URL = os.getenv("MONGODB_URL", "mongodb://chainguard:chainguard_password@localhost:27017/chainguard")
+
+__all__ = ['Database', 'get_database', 'init_db', 'close_db', 'get_db']
 
 class Database:
+    """MongoDB Database Manager"""
+
     def __init__(self):
-        self.client = None
+        self.client: Optional[AsyncIOMotorClient] = None
         self.db = None
-    
-    def connect(self):
+
+    async def connect(self):
         """Connect to MongoDB"""
         try:
-            self.client = MongoClient(
-                DATABASE_URL,
-                serverSelectionTimeoutMS=5000
-            )
+            self.client = AsyncIOMotorClient(MONGODB_URL)
+            self.db = self.client.chainguard
+
             # Test connection
-            self.client.admin.command('ping')
-            self.db = self.client['chainguard']
-            self._create_indexes()
-            return True
-        except ConnectionFailure:
-            return False
-    
-    def _create_indexes(self):
-        """Create indexes for threat_analyses collection"""
-        try:
-            collection = self.db['threat_analyses']
-            collection.create_indexes([
-                ('tx_hash', 1), {'unique': True},
-                ('subnet_id', 1),
-                ('threat_level', 1),
-                ('final_score', 1),
-                ('created_at', -1)
-            ])
+            await self.client.admin.command('ping')
+            logger.info("Successfully connected to MongoDB")
+
+            # Ensure indexes exist
+            await self._ensure_indexes()
+
         except Exception as e:
-            print(f"Error creating indexes: {e}")
-    
-    def close(self):
-        """Close database connection"""
+            logger.error(f"Failed to connect to MongoDB: {e}")
+            raise
+
+    async def disconnect(self):
+        """Disconnect from MongoDB"""
         if self.client:
             self.client.close()
+            logger.info("Disconnected from MongoDB")
 
-class ThreatAnalysis:
-    """MongoDB model for threat analyses"""
-    
-    @staticmethod
-    def create(db: Database, analysis_data: Dict[str, Any]) -> Optional[Dict[str, Any]]:
-        """Create a new threat analysis"""
-        try:
-            collection = db.db['threat_analyses']
-            
-            document = {
-                'tx_hash': analysis_data['tx_hash'],
-                'subnet_id': analysis_data.get('subnet_id'),
-                'signature_score': analysis_data.get('signature_score'),
-                'anomaly_score': analysis_data.get('anomaly_score'),
-                'behavioral_score': analysis_data.get('behavioral_score'),
-                'final_score': analysis_data['final_score'],
-                'threat_level': analysis_data['threat_level'],
-                'explanation': analysis_data['explanation'],
-                'raw_transaction': analysis_data.get('raw_transaction', {}),
-                'created_at': datetime.now(timezone.utc),
-                'updated_at': datetime.now(timezone.utc)
-            }
-            
-            result = collection.insert_one(document)
-            document['_id'] = result.inserted_id
-            return ThreatAnalysis._format_document(document)
-        except DuplicateKeyError:
-            # Update existing if duplicate
-            return ThreatAnalysis.update_by_tx_hash(db, analysis_data['tx_hash'], analysis_data)
-        except Exception as e:
-            print(f"Error creating threat analysis: {e}")
-            return None
-    
-    @staticmethod
-    def get_by_tx_hash(db: Database, tx_hash: str) -> Optional[Dict[str, Any]]:
-        """Get threat analysis by transaction hash"""
-        try:
-            collection = db.db['threat_analyses']
-            document = collection.find_one({'tx_hash': tx_hash})
-            return ThreatAnalysis._format_document(document) if document else None
-        except Exception as e:
-            print(f"Error getting threat analysis: {e}")
-            return None
-    
-    @staticmethod
-    def update_by_tx_hash(db: Database, tx_hash: str, updates: Dict[str, Any]) -> Optional[Dict[str, Any]]:
-        """Update threat analysis by transaction hash"""
-        try:
-            collection = db.db['threat_analyses']
-            update_doc = {
-                '$set': {
-                    **{k: v for k, v in updates.items() if k != 'tx_hash'},
-                    'updated_at': datetime.now(timezone.utc)
-                }
-            }
-            
-            result = collection.find_one_and_update(
-                {'tx_hash': tx_hash},
-                update_doc,
-                return_document=True
+    def _check_connection(self):
+        """Check if database is connected"""
+        if self.db is None:
+            raise RuntimeError(
+                "Database not connected. Call await init_db() or await db.connect() first."
             )
-            return ThreatAnalysis._format_document(result) if result else None
+
+    async def _ensure_indexes(self):
+        """Ensure all necessary indexes exist"""
+        try:
+            # Threat analyses indexes
+            await self.db.threat_analyses.create_indexes([
+                IndexModel([('txHash', ASCENDING)], unique=True),
+                IndexModel([('subnet.subnetId', ASCENDING), ('threatLevel', ASCENDING)]),
+                IndexModel([('subnet.subnetId', ASCENDING), ('scores.final', DESCENDING)]),
+                IndexModel([('createdAt', DESCENDING)])
+            ])
+
+            # Feature store indexes (for ML retraining)
+            await self.db.feature_store.create_indexes([
+                IndexModel([('txHash', ASCENDING)]),
+                IndexModel([('modelVersion', ASCENDING), ('humanVerified', ASCENDING)]),
+                IndexModel([('capturedAt', DESCENDING)])
+            ])
+
+            logger.info("Database indexes verified")
+
         except Exception as e:
-            print(f"Error updating threat analysis: {e}")
-            return None
-    
-    @staticmethod
-    def _format_document(doc: Dict[str, Any]) -> Dict[str, Any]:
-        """Format MongoDB document to match expected format"""
-        if not doc:
-            return None
-        
-        formatted = {
-            'id': str(doc['_id']),
-            'tx_hash': doc.get('tx_hash'),
-            'subnet_id': str(doc['subnet_id']) if doc.get('subnet_id') else None,
-            'signature_score': doc.get('signature_score'),
-            'anomaly_score': doc.get('anomaly_score'),
-            'behavioral_score': doc.get('behavioral_score'),
-            'final_score': doc.get('final_score'),
-            'threat_level': doc.get('threat_level'),
-            'explanation': doc.get('explanation'),
-            'raw_transaction': doc.get('raw_transaction', {}),
-            'created_at': doc.get('created_at'),
-            'updated_at': doc.get('updated_at')
-        }
-        return formatted
+            logger.warning(f"Error creating indexes: {e}")
 
+    async def save_threat_analysis(self, analysis_dict: Dict[str, Any]) -> str:
+        """
+        Save threat analysis to MongoDB
+
+        Args:
+            analysis_dict: Dictionary containing analysis data
+
+        Returns:
+            str: Inserted document ID
+        """
+        self._check_connection()
+
+        try:
+            # Add timestamps
+            analysis_dict['createdAt'] = datetime.now(timezone.utc)
+            analysis_dict['updatedAt'] = datetime.now(timezone.utc)
+
+            result = await self.db.threat_analyses.insert_one(analysis_dict)
+            logger.info(f"Saved threat analysis for tx: {analysis_dict.get('txHash')}")
+            return str(result.inserted_id)
+
+        except Exception as e:
+            logger.error(f"Error saving threat analysis: {e}")
+            raise
+
+    async def get_analysis_by_hash(self, tx_hash: str) -> Optional[Dict[str, Any]]:
+        """
+        Retrieve threat analysis by transaction hash
+
+        Args:
+            tx_hash: Transaction hash
+
+        Returns:
+            Dict or None: Analysis document
+        """
+        try:
+            analysis = await self.db.threat_analyses.find_one({'txHash': tx_hash})
+            return analysis
+
+        except Exception as e:
+            logger.error(f"Error retrieving analysis for {tx_hash}: {e}")
+            return None
+
+    async def update_analysis(self, tx_hash: str, updates: Dict[str, Any]) -> bool:
+        """
+        Update threat analysis
+
+        Args:
+            tx_hash: Transaction hash
+            updates: Fields to update
+
+        Returns:
+            bool: Success status
+        """
+        try:
+            updates['updatedAt'] = datetime.now(timezone.utc)
+
+            result = await self.db.threat_analyses.update_one(
+                {'txHash': tx_hash},
+                {'$set': updates}
+            )
+
+            return result.modified_count > 0
+
+        except Exception as e:
+            logger.error(f"Error updating analysis: {e}")
+            return False
+
+    async def save_features(
+        self,
+        tx_hash: str,
+        features: List[float],
+        predicted_label: str,
+        model_version: str = 'v1'
+    ) -> str:
+        """
+        Save extracted features to feature store for model retraining
+
+        Args:
+            tx_hash: Transaction hash
+            features: Extracted feature vector
+            predicted_label: Model prediction ('threat' or 'normal')
+            model_version: Model version identifier
+
+        Returns:
+            str: Inserted document ID
+        """
+        self._check_connection()
+
+        try:
+            feature_doc = {
+                'txHash': tx_hash,
+                'features': features,
+                'predictedLabel': predicted_label,
+                'actualLabel': None,  # Will be updated when human verifies
+                'humanVerified': False,
+                'modelVersion': model_version,
+                'capturedAt': datetime.now(timezone.utc)
+            }
+
+            result = await self.db.feature_store.insert_one(feature_doc)
+            return str(result.inserted_id)
+
+        except Exception as e:
+            logger.error(f"Error saving features: {e}")
+            raise
+
+    async def update_feature_label(
+        self,
+        tx_hash: str,
+        actual_label: str,
+        human_verified: bool = True
+    ) -> bool:
+        """
+        Update the actual label for a feature (human feedback)
+
+        Args:
+            tx_hash: Transaction hash
+            actual_label: Verified label
+            human_verified: Whether verified by human
+
+        Returns:
+            bool: Success status
+        """
+        try:
+            result = await self.db.feature_store.update_one(
+                {'txHash': tx_hash},
+                {
+                    '$set': {
+                        'actualLabel': actual_label,
+                        'humanVerified': human_verified,
+                        'verifiedAt': datetime.now(timezone.utc)
+                    }
+                }
+            )
+
+            return result.modified_count > 0
+
+        except Exception as e:
+            logger.error(f"Error updating feature label: {e}")
+            return False
+
+    async def get_training_data(
+        self,
+        model_version: Optional[str] = None,
+        human_verified_only: bool = False,
+        limit: int = 10000
+    ) -> List[Dict[str, Any]]:
+        """
+        Retrieve training data from feature store
+
+        Args:
+            model_version: Filter by model version
+            human_verified_only: Only return human-verified samples
+            limit: Maximum number of samples
+
+        Returns:
+            List of feature documents
+        """
+        try:
+            query = {}
+
+            if model_version:
+                query['modelVersion'] = model_version
+
+            if human_verified_only:
+                query['humanVerified'] = True
+
+            cursor = self.db.feature_store.find(query).limit(limit)
+            training_data = await cursor.to_list(length=limit)
+
+            logger.info(f"Retrieved {len(training_data)} training samples")
+            return training_data
+
+        except Exception as e:
+            logger.error(f"Error retrieving training data: {e}")
+            return []
+
+    async def get_recent_analyses(
+        self,
+        subnet_id: Optional[str] = None,
+        threat_level: Optional[str] = None,
+        limit: int = 100
+    ) -> List[Dict[str, Any]]:
+        """
+        Get recent threat analyses
+
+        Args:
+            subnet_id: Filter by subnet
+            threat_level: Filter by threat level
+            limit: Maximum number of results
+
+        Returns:
+            List of analysis documents
+        """
+        try:
+            query = {}
+
+            if subnet_id:
+                query['subnet.subnetId'] = subnet_id
+
+            if threat_level:
+                query['threatLevel'] = threat_level
+
+            cursor = self.db.threat_analyses.find(query)\
+                .sort('createdAt', DESCENDING)\
+                .limit(limit)
+
+            analyses = await cursor.to_list(length=limit)
+            return analyses
+
+        except Exception as e:
+            logger.error(f"Error retrieving analyses: {e}")
+            return []
+
+# Global database instance
+_db_instance: Optional[Database] = None
+
+def get_database() -> Database:
+    """Get or create database instance"""
+    global _db_instance
+    if _db_instance is None:
+        _db_instance = Database()
+    return _db_instance
+
+async def init_db():
+    """Initialize database connection"""
+    db = get_database()
+    await db.connect()
+    logger.info("Database initialized")
+
+async def close_db():
+    """Close database connection"""
+    db = get_database()
+    await db.disconnect()
+
+# For backward compatibility with old code using get_db()
 def get_db():
-    """Get database connection (for compatibility)"""
-    db = Database()
-    if db.connect():
-    try:
-        yield db
-    finally:
-        db.close()
-    else:
-        raise ConnectionError("Failed to connect to MongoDB")
-
-def init_db():
-    """Initialize database (create indexes)"""
-    db = Database()
-    if db.connect():
-        db._create_indexes()
-        db.close()
+    """Compatibility function - returns database instance"""
+    return get_database()

@@ -1,13 +1,12 @@
 from fastapi import FastAPI, HTTPException, Depends, BackgroundTasks
 from fastapi.middleware.cors import CORSMiddleware
-from sqlalchemy.orm import Session
 import logging
 from datetime import datetime
 import asyncio
 from typing import Optional
 
 from app.models import AnalysisRequest, AnalysisResponse, HealthResponse, TransactionInput
-from app.database import get_db, init_db
+from app.database import get_database, init_db, close_db
 from app.analyzer import AIThreatAnalyzer
 
 # Configure logging
@@ -37,17 +36,27 @@ analyzer = AIThreatAnalyzer()
 async def startup_event():
     """Initialize the application"""
     logger.info("Starting ChainGuard AI Engine...")
-    
-    # Initialize database
-    init_db()
-    
+
+    # Initialize MongoDB database connection
+    await init_db()
+
     # Initialize analyzer
     await analyzer.initialize()
-    
+
     # Start background transaction processing
     asyncio.create_task(analyzer.process_transaction_queue())
-    
+
     logger.info("ChainGuard AI Engine started successfully")
+
+@app.on_event("shutdown")
+async def shutdown_event():
+    """Clean shutdown"""
+    logger.info("Shutting down ChainGuard AI Engine...")
+
+    # Close database connection
+    await close_db()
+
+    logger.info("ChainGuard AI Engine shutdown complete")
 
 @app.post("/analyze", response_model=AnalysisResponse)
 async def analyze_transaction(
