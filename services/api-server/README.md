@@ -123,7 +123,7 @@ All responses follow a consistent format:
 ### Environment Variables
 
 #### Database
-- `DATABASE_URL`: PostgreSQL connection string
+- `DATABASE_URL`: MongoDB connection string
 
 #### JWT
 - `JWT_SECRET`: Secret key for JWT signing (default: provided)

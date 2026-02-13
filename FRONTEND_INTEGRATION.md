@@ -32,7 +32,7 @@ This document explains how to integrate the ChainGuard AI frontend with the back
          ├──────────┬──────────┬──────────┐
          ▼          ▼          ▼          ▼
     ┌────────┐ ┌────────┐ ┌────────┐ ┌────────┐
-    │Postgres│ │  Redis │ │  AI    │ │ Alert │
+    │MongoDB │ │  Redis │ │  AI    │ │ Alert │
     │   DB   │ │  Queue │ │ Engine │ │Service│
     └────────┘ └────────┘ └────────┘ └────────┘
 ```

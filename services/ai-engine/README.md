@@ -94,7 +94,7 @@ Basic metrics and queue information.
 ## Configuration
 
 Environment variables:
-- `DATABASE_URL`: PostgreSQL connection string
+- `DATABASE_URL`: MongoDB connection string
 - `REDIS_URL`: Redis connection string
 - `THREAT_THRESHOLD`: Score threshold for triggering alerts (default: 70)
 - `MODEL_PATH`: Path to pre-trained models
@@ -108,7 +108,7 @@ pip install -r requirements.txt
 
 2. Set environment variables:
 ```bash
-export DATABASE_URL="postgresql://..."
+export DATABASE_URL="mongodb://chainguard:chainguard_password@localhost:27017/chainguard?authSource=admin"
 export REDIS_URL="redis://localhost:6379"
 ```
 

@@ -51,11 +51,9 @@ app.get('/health', async (req, res) => {
     const db = app.locals.database;
     let dbStatus = 'disconnected';
     
-    if (db) {
+    if (db && db.db) {
       try {
-        const client = await db.pool.connect();
-        await client.query('SELECT 1');
-        client.release();
+        await db.db.admin().ping();
         dbStatus = 'connected';
       } catch (error) {
         dbStatus = 'error';

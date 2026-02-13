@@ -1,4 +1,4 @@
-const { Pool } = require('pg');
+const { MongoClient, ObjectId } = require('mongodb');
 const winston = require('winston');
 
 const logger = winston.createLogger({
@@ -17,28 +17,28 @@ const logger = winston.createLogger({
 
 class Database {
   constructor() {
-    this.pool = null;
+    this.client = null;
+    this.db = null;
   }
 
   async initialize() {
     try {
       const connectionString = process.env.DATABASE_URL || 
-        'postgresql://chainguard:chainguard_password@localhost:5432/chainguard';
+        'mongodb://chainguard:chainguard_password@localhost:27017/chainguard?authSource=admin';
       
-      this.pool = new Pool({
-        connectionString,
-        max: 20,
-        idleTimeoutMillis: 30000,
-        connectionTimeoutMillis: 2000,
+      this.client = new MongoClient(connectionString, {
+        maxPoolSize: 20,
+        serverSelectionTimeoutMS: 5000,
       });
 
-      // Test connection
-      const client = await this.pool.connect();
-      await client.query('SELECT NOW()');
-      client.release();
+      await this.client.connect();
+      this.db = this.client.db('chainguard');
 
-      // Create tables if they don't exist
-      await this.createTables();
+      // Test connection
+      await this.db.admin().ping();
+
+      // Create collections and indexes
+      await this.createCollections();
       
       logger.info('Database connected successfully');
     } catch (error) {
@@ -47,51 +47,45 @@ class Database {
     }
   }
 
-  async createTables() {
-    const createAlertsTable = `
-      CREATE TABLE IF NOT EXISTS alerts (
-        id SERIAL PRIMARY KEY,
-        alert_id VARCHAR(36) UNIQUE NOT NULL,
-        tx_hash VARCHAR(66) NOT NULL,
-        threat_score FLOAT NOT NULL,
-        threat_level VARCHAR(20) NOT NULL,
-        explanation TEXT,
-        transaction_data JSONB,
-        notification_channels JSONB,
-        notification_sent BOOLEAN DEFAULT FALSE,
-        acknowledged BOOLEAN DEFAULT FALSE,
-        false_positive BOOLEAN DEFAULT FALSE,
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-      );
-    `;
-
-    const createAlertLogsTable = `
-      CREATE TABLE IF NOT EXISTS alert_logs (
-        id SERIAL PRIMARY KEY,
-        alert_id VARCHAR(36) REFERENCES alerts(alert_id),
-        channel VARCHAR(50) NOT NULL,
-        status VARCHAR(20) NOT NULL,
-        message TEXT,
-        error TEXT,
-        sent_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-      );
-    `;
-
-    const createIndexes = `
-      CREATE INDEX IF NOT EXISTS idx_alerts_tx_hash ON alerts(tx_hash);
-      CREATE INDEX IF NOT EXISTS idx_alerts_threat_level ON alerts(threat_level);
-      CREATE INDEX IF NOT EXISTS idx_alerts_created_at ON alerts(created_at);
-      CREATE INDEX IF NOT EXISTS idx_alert_logs_alert_id ON alert_logs(alert_id);
-    `;
-
+  async createCollections() {
     try {
-      await this.pool.query(createAlertsTable);
-      await this.pool.query(createAlertLogsTable);
-      await this.pool.query(createIndexes);
-      logger.info('Database tables created/verified');
+      const collections = ['alerts', 'alert_logs'];
+      
+      for (const collectionName of collections) {
+        const collections = await this.db.listCollections({ name: collectionName }).toArray();
+        if (collections.length === 0) {
+          await this.db.createCollection(collectionName);
+          logger.info(`Created collection: ${collectionName}`);
+        }
+      }
+
+      await this.createIndexes();
+      logger.info('Database collections and indexes created/verified');
     } catch (error) {
-      logger.error('Failed to create database tables:', error);
+      logger.error('Failed to create collections:', error);
+      throw error;
+    }
+  }
+
+  async createIndexes() {
+    try {
+      await this.db.collection('alerts').createIndexes([
+        { key: { alert_id: 1 }, unique: true },
+        { key: { tx_hash: 1 } },
+        { key: { threat_level: 1 } },
+        { key: { created_at: -1 } }
+      ]);
+
+      await this.db.collection('alert_logs').createIndexes([
+        { key: { alert_id: 1 } },
+        { key: { channel: 1 } },
+        { key: { status: 1 } },
+        { key: { sent_at: -1 } }
+      ]);
+
+      logger.info('Indexes created successfully');
+    } catch (error) {
+      logger.error('Failed to create indexes:', error);
       throw error;
     }
   }
@@ -107,26 +101,24 @@ class Database {
       notificationChannels
     } = alertData;
 
-    const query = `
-      INSERT INTO alerts (
-        alert_id, tx_hash, threat_score, threat_level, explanation, 
-        transaction_data, notification_channels
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7)
-      RETURNING *;
-    `;
-
     try {
-      const result = await this.pool.query(query, [
-        alertId,
-        txHash,
-        threatScore,
-        threatLevel,
+      const result = await this.db.collection('alerts').insertOne({
+        alert_id: alertId,
+        tx_hash: txHash,
+        threat_score: threatScore,
+        threat_level: threatLevel,
         explanation,
-        JSON.stringify(transactionData),
-        JSON.stringify(notificationChannels)
-      ]);
+        transaction_data: transactionData,
+        notification_channels: notificationChannels,
+        notification_sent: false,
+        acknowledged: false,
+        false_positive: false,
+        created_at: new Date(),
+        updated_at: new Date()
+      });
 
-      return result.rows[0];
+      const alert = await this.db.collection('alerts').findOne({ _id: result.insertedId });
+      return this.formatAlert(alert);
     } catch (error) {
       logger.error('Failed to create alert:', error);
       throw error;
@@ -134,11 +126,9 @@ class Database {
   }
 
   async getAlert(alertId) {
-    const query = 'SELECT * FROM alerts WHERE alert_id = $1';
-
     try {
-      const result = await this.pool.query(query, [alertId]);
-      return result.rows[0] || null;
+      const alert = await this.db.collection('alerts').findOne({ alert_id: alertId });
+      return alert ? this.formatAlert(alert) : null;
     } catch (error) {
       logger.error('Failed to get alert:', error);
       throw error;
@@ -146,20 +136,16 @@ class Database {
   }
 
   async updateAlert(alertId, updates) {
-    const fields = Object.keys(updates);
-    const values = Object.values(updates);
-    
-    const setClause = fields.map((field, index) => `${field} = $${index + 2}`).join(', ');
-    const query = `
-      UPDATE alerts 
-      SET ${setClause}, updated_at = CURRENT_TIMESTAMP 
-      WHERE alert_id = $1 
-      RETURNING *;
-    `;
-
     try {
-      const result = await this.pool.query(query, [alertId, ...values]);
-      return result.rows[0];
+      const updateDoc = { ...updates, updated_at: new Date() };
+      
+      await this.db.collection('alerts').updateOne(
+        { alert_id: alertId },
+        { $set: updateDoc }
+      );
+
+      const alert = await this.db.collection('alerts').findOne({ alert_id: alertId });
+      return alert ? this.formatAlert(alert) : null;
     } catch (error) {
       logger.error('Failed to update alert:', error);
       throw error;
@@ -167,15 +153,18 @@ class Database {
   }
 
   async logNotification(alertId, channel, status, message = null, error = null) {
-    const query = `
-      INSERT INTO alert_logs (alert_id, channel, status, message, error)
-      VALUES ($1, $2, $3, $4, $5)
-      RETURNING *;
-    `;
-
     try {
-      const result = await this.pool.query(query, [alertId, channel, status, message, error]);
-      return result.rows[0];
+      const result = await this.db.collection('alert_logs').insertOne({
+        alert_id: alertId,
+        channel,
+        status,
+        message,
+        error,
+        sent_at: new Date()
+      });
+
+      const log = await this.db.collection('alert_logs').findOne({ _id: result.insertedId });
+      return this.formatAlertLog(log);
     } catch (error) {
       logger.error('Failed to log notification:', error);
       throw error;
@@ -183,38 +172,30 @@ class Database {
   }
 
   async getAlertHistory(limit = 100, offset = 0, filters = {}) {
-    let query = 'SELECT * FROM alerts';
-    const params = [];
-    let paramIndex = 1;
+    try {
+      const query = {};
 
-    const conditions = [];
     if (filters.threatLevel) {
-      conditions.push(`threat_level = $${paramIndex++}`);
-      params.push(filters.threatLevel);
+        query.threat_level = filters.threatLevel;
     }
     if (filters.startDate) {
-      conditions.push(`created_at >= $${paramIndex++}`);
-      params.push(filters.startDate);
+        query.created_at = { ...query.created_at, $gte: new Date(filters.startDate) };
     }
     if (filters.endDate) {
-      conditions.push(`created_at <= $${paramIndex++}`);
-      params.push(filters.endDate);
+        query.created_at = { ...query.created_at, $lte: new Date(filters.endDate) };
     }
     if (filters.acknowledged !== undefined) {
-      conditions.push(`acknowledged = $${paramIndex++}`);
-      params.push(filters.acknowledged);
-    }
+        query.acknowledged = filters.acknowledged;
+      }
 
-    if (conditions.length > 0) {
-      query += ' WHERE ' + conditions.join(' AND ');
-    }
+      const alerts = await this.db.collection('alerts')
+        .find(query)
+        .sort({ created_at: -1 })
+        .limit(limit)
+        .skip(offset)
+        .toArray();
 
-    query += ` ORDER BY created_at DESC LIMIT $${paramIndex++} OFFSET $${paramIndex++}`;
-    params.push(limit, offset);
-
-    try {
-      const result = await this.pool.query(query, params);
-      return result.rows;
+      return alerts.map(a => this.formatAlert(a));
     } catch (error) {
       logger.error('Failed to get alert history:', error);
       throw error;
@@ -222,15 +203,14 @@ class Database {
   }
 
   async checkDuplicateAlert(txHash, timeWindowMinutes = 5) {
-    const query = `
-      SELECT COUNT(*) as count 
-      FROM alerts 
-      WHERE tx_hash = $1 AND created_at > NOW() - INTERVAL '${timeWindowMinutes} minutes'
-    `;
-
     try {
-      const result = await this.pool.query(query, [txHash]);
-      return parseInt(result.rows[0].count) > 0;
+      const timeWindow = new Date(Date.now() - timeWindowMinutes * 60 * 1000);
+      const count = await this.db.collection('alerts').countDocuments({
+        tx_hash: txHash,
+        created_at: { $gte: timeWindow }
+      });
+      
+      return count > 0;
     } catch (error) {
       logger.error('Failed to check duplicate alert:', error);
       throw error;
@@ -238,35 +218,81 @@ class Database {
   }
 
   async getStats() {
-    const queries = {
-      total: 'SELECT COUNT(*) as count FROM alerts',
-      critical: "SELECT COUNT(*) as count FROM alerts WHERE threat_level = 'CRITICAL'",
-      high: "SELECT COUNT(*) as count FROM alerts WHERE threat_level = 'HIGH'",
-      medium: "SELECT COUNT(*) as count FROM alerts WHERE threat_level = 'MEDIUM'",
-      low: "SELECT COUNT(*) as count FROM alerts WHERE threat_level = 'LOW'",
-      acknowledged: 'SELECT COUNT(*) as count FROM alerts WHERE acknowledged = true',
-      falsePositives: 'SELECT COUNT(*) as count FROM alerts WHERE false_positive = true',
-      today: "SELECT COUNT(*) as count FROM alerts WHERE DATE(created_at) = CURRENT_DATE"
-    };
-
     try {
-      const results = await Promise.all(
-        Object.entries(queries).map(async ([key, query]) => {
-          const result = await this.pool.query(query);
-          return [key, parseInt(result.rows[0].count)];
+      const [
+        total,
+        critical,
+        high,
+        medium,
+        low,
+        acknowledged,
+        falsePositives,
+        today
+      ] = await Promise.all([
+        this.db.collection('alerts').countDocuments(),
+        this.db.collection('alerts').countDocuments({ threat_level: 'CRITICAL' }),
+        this.db.collection('alerts').countDocuments({ threat_level: 'HIGH' }),
+        this.db.collection('alerts').countDocuments({ threat_level: 'MEDIUM' }),
+        this.db.collection('alerts').countDocuments({ threat_level: 'LOW' }),
+        this.db.collection('alerts').countDocuments({ acknowledged: true }),
+        this.db.collection('alerts').countDocuments({ false_positive: true }),
+        this.db.collection('alerts').countDocuments({
+          created_at: { $gte: new Date(new Date().setHours(0, 0, 0, 0)) }
         })
-      );
+      ]);
 
-      return Object.fromEntries(results);
+      return {
+        total,
+        critical,
+        high,
+        medium,
+        low,
+        acknowledged,
+        falsePositives,
+        today
+      };
     } catch (error) {
       logger.error('Failed to get alert stats:', error);
       throw error;
     }
   }
 
+  formatAlert(alert) {
+    return {
+      id: alert._id.toString(),
+      alert_id: alert.alert_id,
+      tx_hash: alert.tx_hash,
+      subnet_id: alert.subnet_id?.toString(),
+      threat_score: alert.threat_score,
+      threat_level: alert.threat_level,
+      explanation: alert.explanation,
+      transaction_data: alert.transaction_data,
+      notification_channels: alert.notification_channels,
+      notification_sent: alert.notification_sent,
+      acknowledged: alert.acknowledged,
+      false_positive: alert.false_positive,
+      acknowledged_by: alert.acknowledged_by?.toString(),
+      acknowledged_at: alert.acknowledged_at,
+      created_at: alert.created_at,
+      updated_at: alert.updated_at
+    };
+  }
+
+  formatAlertLog(log) {
+    return {
+      id: log._id.toString(),
+      alert_id: log.alert_id,
+      channel: log.channel,
+      status: log.status,
+      message: log.message,
+      error: log.error,
+      sent_at: log.sent_at
+    };
+  }
+
   async close() {
-    if (this.pool) {
-      await this.pool.end();
+    if (this.client) {
+      await this.client.close();
       logger.info('Database connection closed');
     }
   }

@@ -40,7 +40,7 @@ fi
 # Create necessary directories
 echo -e "${YELLOW}📁 Creating necessary directories...${NC}"
 mkdir -p logs
-mkdir -p data/postgres
+mkdir -p data/mongodb
 mkdir -p data/redis
 mkdir -p data/models
 mkdir -p monitoring/grafana/dashboards
@@ -61,8 +61,8 @@ else
 fi
 
 # Start core services
-echo -e "${YELLOW}🚀 Starting core services (PostgreSQL, Redis)...${NC}"
-docker-compose up -d postgres redis
+echo -e "${YELLOW}🚀 Starting core services (MongoDB, Redis)...${NC}"
+docker-compose up -d mongodb redis
 
 # Wait for database to be ready
 echo -e "${YELLOW}⏳ Waiting for database to be ready...${NC}"
@@ -70,7 +70,7 @@ sleep 10
 
 # Check database connectivity
 for i in {1..30}; do
-    if docker-compose exec -T postgres pg_isready -U chainguard -d chainguard; then
+    if docker-compose exec -T mongodb mongosh --eval "db.adminCommand('ping')" --quiet > /dev/null 2>&1; then
         echo -e "${GREEN}✅ Database is ready${NC}"
         break
     fi
@@ -113,7 +113,7 @@ echo -e "  🌐 API Server:        ${GREEN}http://localhost:3000${NC}"
 echo -e "  🧠 AI Engine:         ${GREEN}http://localhost:8000${NC}"
 echo -e "  🚨 Alert Service:     ${GREEN}http://localhost:3001${NC}"
 echo -e "  📊 Ingestion Metrics: ${GREEN}http://localhost:9000${NC}"
-echo -e "  🗄️  Database:          ${GREEN}postgresql://chainguard:chainguard_password@localhost:5432/chainguard${NC}"
+echo -e "  🗄️  Database:          ${GREEN}mongodb://chainguard:chainguard_password@localhost:27017/chainguard?authSource=admin${NC}"
 echo -e "  🔴 Redis:             ${GREEN}redis://localhost:6379${NC}"
 echo ""
 echo -e "${BLUE}🔑 Default Login:${NC}"

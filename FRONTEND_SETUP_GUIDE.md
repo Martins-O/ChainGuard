@@ -39,7 +39,7 @@ frontend/
 
 ### Documentation Files
 - `frontend/README.md` - Frontend-specific documentation
-- `database/POSTGRESQL_SETUP.md` - Complete PostgreSQL setup guide
+- `database/MONGODB_SETUP.md` - Complete MongoDB setup guide
 - `FRONTEND_INTEGRATION.md` - Integration guide for frontend with backend
 - `FRONTEND_SETUP_GUIDE.md` - This file (quick start guide)
 
@@ -173,7 +173,7 @@ const response = await subnetsAPI.getAll()
 The frontend **does not** directly connect to the database. All database operations go through the API server:
 
 ```
-Frontend → API Server → PostgreSQL Database
+Frontend → API Server → MongoDB Database
 ```
 
 ### Authentication Flow
@@ -197,23 +197,21 @@ chmod +x setup.sh
 
 ### Manual Setup
 
-See `database/POSTGRESQL_SETUP.md` for detailed instructions.
+See `database/MONGODB_SETUP.md` for detailed instructions.
 
 **Quick commands**:
 
 ```bash
-# Create database
-psql -U postgres -c "CREATE DATABASE chainguard;"
+# Start MongoDB (Docker)
+docker-compose up -d mongodb
 
-# Create user
-psql -U postgres -c "CREATE USER chainguard WITH PASSWORD 'chainguard_password';"
+# Connect to MongoDB
+mongosh "mongodb://chainguard:chainguard_password@localhost:27017/chainguard?authSource=admin"
 
-# Grant privileges
-psql -U postgres -c "GRANT ALL PRIVILEGES ON DATABASE chainguard TO chainguard;"
-
-# Run migrations
-psql -U chainguard -d chainguard -f migrations/001_initial_schema.sql
-psql -U chainguard -d chainguard -f migrations/002_performance_indexes.sql
+# Run setup script
+cd database
+chmod +x setup.sh
+./setup.sh
 ```
 
 ## 🔄 Data Flow Examples
@@ -229,7 +227,7 @@ const response = await subnetsAPI.getAll()
 const subnets = await db.getSubnets(limit, offset)
 
 // 3. Database returns results
-// (PostgreSQL query executed)
+// (MongoDB query executed)
 
 // 4. API formats response
 res.json({ success: true, data: subnets })
@@ -362,7 +360,7 @@ docker run -p 80:80 chainguard-frontend
 - Clear localStorage and re-login
 
 ### Database connection errors
-- Verify PostgreSQL is running
+- Verify MongoDB is running
 - Check connection string in API server `.env`
 - Test database: `psql -U chainguard -d chainguard`
 
@@ -374,7 +372,7 @@ docker run -p 80:80 chainguard-frontend
 ## 📚 Documentation Reference
 
 - **Frontend Details**: `frontend/README.md`
-- **PostgreSQL Setup**: `database/POSTGRESQL_SETUP.md`
+- **MongoDB Setup**: `database/MONGODB_SETUP.md`
 - **Integration Guide**: `FRONTEND_INTEGRATION.md`
 - **Main Project**: `README.md`
 
@@ -382,7 +380,7 @@ docker run -p 80:80 chainguard-frontend
 
 Before deploying:
 
-- [ ] PostgreSQL installed and configured
+- [ ] MongoDB installed and configured
 - [ ] Database created and migrations run
 - [ ] API server running and accessible
 - [ ] Frontend dependencies installed

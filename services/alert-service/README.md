@@ -8,7 +8,7 @@ Alert management service that processes security threat alerts from the AI engin
 ### Alert Processing
 - Real-time consumption from Redis queue
 - Duplicate detection and deduplication
-- Alert persistence in PostgreSQL
+- Alert persistence in MongoDB
 - Notification status tracking
 
 ### Notification Channels
@@ -86,7 +86,7 @@ Test notification channels.
 ### Environment Variables
 
 #### Database
-- `DATABASE_URL`: PostgreSQL connection string
+- `DATABASE_URL`: MongoDB connection string
 
 #### Redis
 - `REDIS_URL`: Redis connection string

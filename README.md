@@ -10,7 +10,7 @@ ChainGuard AI provides comprehensive security monitoring for Avalanche blockchai
 - **AI Threat Analysis** (Python) - Multi-model security analysis  
 - **Intelligent Alerting** (Node.js) - Smart notification routing
 - **RESTful API** (Node.js) - Complete management interface
-- **PostgreSQL Database** - Scalable data persistence
+- **MongoDB Database** - Scalable data persistence
 
 ## 🏗️ Architecture
 
@@ -24,7 +24,7 @@ ChainGuard AI provides comprehensive security monitoring for Avalanche blockchai
                               ▼                        ▼
 ┌─────────────────┐    ┌──────────────────┐    ┌─────────────────┐
 │                 │────│   AI Engine     │────│                 │
-│   PostgreSQL   │    │   (Python)      │    │ Alert Service  │
+│   MongoDB      │    │   (Python)      │    │ Alert Service  │
 │   Database     │────│                  │────│  (Node.js)     │
 │                 │    │  • Signature    │    │  • Slack       │
 └─────────────────┘    │  • Anomaly      │    │  • Email       │
@@ -68,7 +68,7 @@ ChainGuard AI provides comprehensive security monitoring for Avalanche blockchai
 - RESTful design with pagination
 
 ### 🗄️ Scalable Database
-- PostgreSQL with optimized schema
+- MongoDB with optimized collections and indexes
 - Comprehensive indexing strategy
 - JSONB for flexible data storage
 - Automated migrations
@@ -146,10 +146,10 @@ docker-compose --profile production up -d
 - **Features**: REST API, JWT auth, subnet management
 - **Docs**: Built-in OpenAPI documentation
 
-### 5️⃣ PostgreSQL Database
-- **Port**: 5432
-- **Features**: Schema migrations, optimized indexing
-- **Connection**: `postgresql://chainguard:chainguard_password@localhost:5432/chainguard`
+### 5️⃣ MongoDB Database
+- **Port**: 27017
+- **Features**: Collections, optimized indexing, document storage
+- **Connection**: `mongodb://chainguard:chainguard_password@localhost:27017/chainguard?authSource=admin`
 
 ## 🔧 Configuration
 
@@ -159,7 +159,7 @@ Key configuration options in `.env`:
 
 ```bash
 # Database
-DATABASE_URL=postgresql://chainguard:chainguard_password@localhost:5432/chainguard
+DATABASE_URL=mongodb://chainguard:chainguard_password@localhost:27017/chainguard?authSource=admin
 
 # AI Engine
 THREAT_THRESHOLD=70          # Alert trigger threshold
@@ -412,10 +412,10 @@ netstat -tulpn | grep :3000
 **Database connection issues**
 ```bash
 # Test database connection
-docker-compose exec postgres psql -U chainguard -d chainguard
+docker-compose exec mongodb mongosh -u chainguard -p chainguard_password --authenticationDatabase admin chainguard
 
 # Check migrations
-docker-compose exec postgres \dt
+docker-compose exec mongodb mongosh -u chainguard -p chainguard_password --authenticationDatabase admin chainguard --eval "show collections"
 ```
 
 **High memory usage**
@@ -432,7 +432,7 @@ docker system prune -a
 **Database Optimization**
 - Analyze query patterns with `EXPLAIN ANALYZE`
 - Monitor slow queries with `pg_stat_statements`
-- Adjust PostgreSQL configuration in production
+- Adjust MongoDB configuration in production
 
 **Memory Management**
 - Limit Rust ingestion service workers

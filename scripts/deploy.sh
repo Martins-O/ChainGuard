@@ -56,10 +56,11 @@ log "✅ Pre-deployment checks passed"
 log "📦 Creating backup of current data..."
 
 # Backup database
-if docker-compose ps postgres | grep -q "Up"; then
-    log "📊 Backing up PostgreSQL database..."
+if docker-compose ps mongodb | grep -q "Up"; then
+    log "📊 Backing up MongoDB database..."
     mkdir -p "$BACKUP_DIR"
-    docker-compose exec -T postgres pg_dump -U chainguard chainguard > "$BACKUP_DIR/database_backup.sql"
+    docker-compose exec -T mongodb mongodump --uri="mongodb://chainguard:chainguard_password@localhost:27017/chainguard?authSource=admin" --out=/tmp/backup
+    docker cp $(docker-compose ps -q mongodb):/tmp/backup "$BACKUP_DIR/mongodb_backup"
     log "✅ Database backup completed"
 fi
 
@@ -106,12 +107,12 @@ log "🚀 Starting services in production mode..."
 
 # Start core services first
 log "📊 Starting database and Redis..."
-docker-compose up -d postgres redis
+docker-compose up -d mongodb redis
 
 # Wait for database
 log "⏳ Waiting for database to be ready..."
 for i in {1..60}; do
-    if docker-compose exec -T postgres pg_isready -U chainguard -d chainguard; then
+    if docker-compose exec -T mongodb mongosh --eval "db.adminCommand('ping')" --quiet > /dev/null 2>&1; then
         log "✅ Database is ready"
         break
     fi
