@@ -43,7 +43,7 @@ class Database {
 
       // Create collections and indexes
       await this.createCollections();
-      
+
       logger.info('MongoDB connected successfully');
     } catch (error) {
       logger.error('Failed to connect to MongoDB:', error);
@@ -55,7 +55,7 @@ class Database {
     try {
       // Create collections if they don't exist
       const collections = ['users', 'subnets', 'transactions', 'threat_analyses', 'alerts', 'alert_logs'];
-      
+
       for (const collectionName of collections) {
         const existingCollections = await this.db.listCollections({ name: collectionName }).toArray();
         if (existingCollections.length === 0) {
@@ -66,10 +66,10 @@ class Database {
 
       // Create indexes
       await this.createIndexes();
-      
+
       // Create default admin user
       await this.createDefaultAdmin();
-      
+
       logger.info('Database collections and indexes created/verified');
     } catch (error) {
       logger.error('Failed to create collections:', error);
@@ -143,7 +143,7 @@ class Database {
   async createDefaultAdmin() {
     try {
       const adminExists = await this.db.collection('users').findOne({ username: 'admin' });
-      
+
       if (!adminExists) {
         const passwordHash = await bcrypt.hash('admin123', 10);
         await this.db.collection('users').insertOne({
@@ -232,21 +232,6 @@ class Database {
     try {
       const result = await this.db.collection('subnets').insertOne({
         name,
-<<<<<<< HEAD
-        chain_id: chainId,
-        rpc_url: rpcUrl,
-        websocket_url: websocketUrl,
-        description: description || null,
-        is_active: true,
-        monitoring_enabled: true,
-        created_by: createdBy ? new ObjectId(createdBy) : null,
-        created_at: new Date(),
-        updated_at: new Date()
-      });
-
-      const subnet = await this.db.collection('subnets').findOne({ _id: result.insertedId });
-      return this.formatSubnet(subnet);
-=======
         chainId,
         rpcUrl,
         websocketUrl,
@@ -262,8 +247,7 @@ class Database {
       });
 
       const subnet = await this.db.collection('subnets').findOne({ _id: result.insertedId });
-      return this._formatSubnet(subnet);
->>>>>>> cef979a9d3c0b7abcc524caf7fa6fdbb5feeaded
+      return this.formatSubnet(subnet);
     } catch (error) {
       logger.error('Failed to create subnet:', error);
       throw error;
@@ -273,40 +257,22 @@ class Database {
   async getSubnets(limit = 100, offset = 0, filters = {}) {
     try {
       const query = {};
-<<<<<<< HEAD
-      
-      if (filters.isActive !== undefined) {
-        query.is_active = filters.isActive;
-      }
-      if (filters.monitoringEnabled !== undefined) {
-        query.monitoring_enabled = filters.monitoringEnabled;
-=======
 
       if (filters.isActive !== undefined) {
         query.isActive = filters.isActive;
       }
       if (filters.monitoringEnabled !== undefined) {
         query.monitoringEnabled = filters.monitoringEnabled;
->>>>>>> cef979a9d3c0b7abcc524caf7fa6fdbb5feeaded
       }
 
       const subnets = await this.db.collection('subnets')
         .find(query)
-<<<<<<< HEAD
-        .sort({ created_at: -1 })
-        .limit(limit)
-        .skip(offset)
-        .toArray();
-
-      return subnets.map(s => this.formatSubnet(s));
-=======
         .sort({ createdAt: -1 })
         .skip(offset)
         .limit(limit)
         .toArray();
 
-      return subnets.map(subnet => this._formatSubnet(subnet));
->>>>>>> cef979a9d3c0b7abcc524caf7fa6fdbb5feeaded
+      return subnets.map(subnet => this.formatSubnet(subnet));
     } catch (error) {
       logger.error('Failed to get subnets:', error);
       throw error;
@@ -319,29 +285,19 @@ class Database {
       return subnet ? this.formatSubnet(subnet) : null;
     } catch (error) {
       logger.error('Failed to get subnet:', error);
-      return null;
+      throw error;
     }
   }
 
   async updateSubnet(id, updates) {
     try {
-      const updateDoc = { ...updates, updated_at: new Date() };
-      
-      // Convert field names from camelCase to snake_case if needed
-      const formattedUpdates = {};
-      Object.keys(updateDoc).forEach(key => {
-        const mongoKey = key === 'isActive' ? 'is_active' : 
-                        key === 'monitoringEnabled' ? 'monitoring_enabled' : key;
-        formattedUpdates[mongoKey] = updateDoc[key];
-      });
-
-      await this.db.collection('subnets').updateOne(
+      const result = await this.db.collection('subnets').findOneAndUpdate(
         { _id: new ObjectId(id) },
-        { $set: formattedUpdates }
+        { $set: { ...updates, updatedAt: new Date() } },
+        { returnDocument: 'after' }
       );
-
-      const subnet = await this.db.collection('subnets').findOne({ _id: new ObjectId(id) });
-      return subnet ? this.formatSubnet(subnet) : null;
+      const updatedSubnet = result.value || result; // Handle different driver versions
+      return updatedSubnet ? this.formatSubnet(updatedSubnet) : null;
     } catch (error) {
       logger.error('Failed to update subnet:', error);
       throw error;
@@ -361,62 +317,29 @@ class Database {
     }
   }
 
-  formatSubnet(subnet) {
-    return {
-      id: subnet._id.toString(),
-      name: subnet.name,
-      chain_id: subnet.chain_id,
-      rpc_url: subnet.rpc_url,
-      websocket_url: subnet.websocket_url,
-      description: subnet.description,
-      is_active: subnet.is_active,
-      monitoring_enabled: subnet.monitoring_enabled,
-      created_by: subnet.created_by?.toString(),
-      created_at: subnet.created_at,
-      updated_at: subnet.updated_at
-    };
-  }
-
   // Transaction management
   async getTransactions(subnetId, limit = 100, offset = 0, filters = {}) {
     try {
-<<<<<<< HEAD
-      const query = { subnet_id: new ObjectId(subnetId) };
+      const query = { 'subnet.subnetId': new ObjectId(subnetId) };
 
-      if (filters.fromAddress) {
-        query.from_address = filters.fromAddress;
-      }
-      if (filters.toAddress) {
-        query.to_address = filters.toAddress;
-      }
-      if (filters.status !== undefined) {
-        query.status = filters.status;
-      }
-      if (filters.startDate) {
-        query.created_at = { ...query.created_at, $gte: new Date(filters.startDate) };
-      }
-      if (filters.endDate) {
-        query.created_at = { ...query.created_at, $lte: new Date(filters.endDate) };
-      }
+      if (filters.fromAddress) query.fromAddress = filters.fromAddress;
+      if (filters.toAddress) query.toAddress = filters.toAddress;
+      if (filters.status !== undefined) query.status = filters.status;
+
+      if (filters.startDate || filters.endDate) {
+        query.createdAt = {};
+        if (filters.startDate) query.createdAt.$gte = new Date(filters.startDate);
+        if (filters.endDate) query.createdAt.$lte = new Date(filters.endDate);
       }
 
       const transactions = await this.db.collection('transactions')
         .find(query)
-<<<<<<< HEAD
-        .sort({ created_at: -1 })
-        .limit(limit)
-        .skip(offset)
-        .toArray();
-
-      return transactions.map(t => this.formatTransaction(t));
-=======
         .sort({ createdAt: -1 })
         .skip(offset)
         .limit(limit)
         .toArray();
 
-      return transactions.map(tx => this._formatTransaction(tx));
->>>>>>> cef979a9d3c0b7abcc524caf7fa6fdbb5feeaded
+      return transactions.map(tx => this.formatTransaction(tx));
     } catch (error) {
       logger.error('Failed to get transactions:', error);
       throw error;
@@ -425,93 +348,36 @@ class Database {
 
   async getTransactionByHash(txHash) {
     try {
-<<<<<<< HEAD
-      const transaction = await this.db.collection('transactions').findOne({ tx_hash: txHash });
-      return transaction ? this.formatTransaction(transaction) : null;
-=======
       const transaction = await this.db.collection('transactions').findOne({ txHash });
-      return transaction ? this._formatTransaction(transaction) : null;
->>>>>>> cef979a9d3c0b7abcc524caf7fa6fdbb5feeaded
+      return transaction ? this.formatTransaction(transaction) : null;
     } catch (error) {
       logger.error('Failed to get transaction:', error);
       throw error;
     }
   }
 
-  formatTransaction(tx) {
-    return {
-      id: tx._id.toString(),
-      tx_hash: tx.tx_hash,
-      subnet_id: tx.subnet_id?.toString(),
-      block_number: tx.block_number,
-      transaction_index: tx.transaction_index,
-      from_address: tx.from_address,
-      to_address: tx.to_address,
-      value: tx.value,
-      gas_used: tx.gas_used,
-      gas_limit: tx.gas_limit,
-      gas_price: tx.gas_price,
-      transaction_data: tx.transaction_data,
-      decoded_call: tx.decoded_call,
-      logs: tx.logs,
-      status: tx.status,
-      created_at: tx.created_at
-    };
-  }
-
   // Alert management
   async getAlerts(subnetId, limit = 100, offset = 0, filters = {}) {
     try {
-<<<<<<< HEAD
-      const query = { subnet_id: new ObjectId(subnetId) };
-
-      if (filters.threatLevel) {
-        query.threat_level = filters.threatLevel;
-=======
       const query = { 'subnet.subnetId': new ObjectId(subnetId) };
 
-      if (filters.threatLevel) {
-        query.threatLevel = filters.threatLevel;
->>>>>>> cef979a9d3c0b7abcc524caf7fa6fdbb5feeaded
-      }
-      if (filters.acknowledged !== undefined) {
-        query.acknowledged = filters.acknowledged;
-      }
-<<<<<<< HEAD
-      if (filters.startDate) {
-        query.created_at = { ...query.created_at, $gte: new Date(filters.startDate) };
-      }
-      if (filters.endDate) {
-        query.created_at = { ...query.created_at, $lte: new Date(filters.endDate) };
-=======
+      if (filters.threatLevel) query.threatLevel = filters.threatLevel;
+      if (filters.acknowledged !== undefined) query.acknowledged = filters.acknowledged;
+
       if (filters.startDate || filters.endDate) {
         query.createdAt = {};
-        if (filters.startDate) {
-          query.createdAt.$gte = new Date(filters.startDate);
-        }
-        if (filters.endDate) {
-          query.createdAt.$lte = new Date(filters.endDate);
-        }
->>>>>>> cef979a9d3c0b7abcc524caf7fa6fdbb5feeaded
+        if (filters.startDate) query.createdAt.$gte = new Date(filters.startDate);
+        if (filters.endDate) query.createdAt.$lte = new Date(filters.endDate);
       }
 
       const alerts = await this.db.collection('alerts')
         .find(query)
-<<<<<<< HEAD
-        .sort({ created_at: -1 })
-        .limit(limit)
-        .skip(offset)
-        .toArray();
-
-      return alerts.map(a => this.formatAlert(a));
-=======
         .sort({ createdAt: -1 })
         .skip(offset)
         .limit(limit)
         .toArray();
 
-      return alerts.map(alert => this._formatAlert(alert));
->>>>>>> cef979a9d3c0b7abcc524caf7fa6fdbb5feeaded
+      return alerts.map(alert => this.formatAlert(alert));
     } catch (error) {
       logger.error('Failed to get alerts:', error);
       throw error;
@@ -520,39 +386,22 @@ class Database {
 
   async acknowledgeAlert(alertId, userId) {
     try {
-<<<<<<< HEAD
-      await this.db.collection('alerts').updateOne(
-=======
       const result = await this.db.collection('alerts').findOneAndUpdate(
->>>>>>> cef979a9d3c0b7abcc524caf7fa6fdbb5feeaded
         { _id: new ObjectId(alertId) },
         {
           $set: {
             acknowledged: true,
-<<<<<<< HEAD
-            acknowledged_by: new ObjectId(userId),
-            acknowledged_at: new Date(),
-            updated_at: new Date()
-          }
-        }
-      );
-
-      const alert = await this.db.collection('alerts').findOne({ _id: new ObjectId(alertId) });
-      return alert ? this.formatAlert(alert) : null;
-=======
             acknowledgedBy: {
               userId: new ObjectId(userId),
-              username: 'api_user'
+              at: new Date()
             },
-            acknowledgedAt: new Date(),
             updatedAt: new Date()
           }
         },
         { returnDocument: 'after' }
       );
-
-      return result.value ? this._formatAlert(result.value) : null;
->>>>>>> cef979a9d3c0b7abcc524caf7fa6fdbb5feeaded
+      const updatedAlert = result.value || result;
+      return updatedAlert ? this.formatAlert(updatedAlert) : null;
     } catch (error) {
       logger.error('Failed to acknowledge alert:', error);
       throw error;
@@ -561,73 +410,28 @@ class Database {
 
   async markFalsePositive(alertId, userId) {
     try {
-<<<<<<< HEAD
-      await this.db.collection('alerts').updateOne(
-        { _id: new ObjectId(alertId) },
-        {
-          $set: {
-            false_positive: true,
-            acknowledged: true,
-            acknowledged_by: new ObjectId(userId),
-            acknowledged_at: new Date(),
-            updated_at: new Date()
-          }
-        }
-      );
-
-      const alert = await this.db.collection('alerts').findOne({ _id: new ObjectId(alertId) });
-      return alert ? this.formatAlert(alert) : null;
-=======
       const result = await this.db.collection('alerts').findOneAndUpdate(
         { _id: new ObjectId(alertId) },
         {
           $set: {
             falsePositive: true,
-            acknowledged: true,
-            acknowledgedBy: {
+            markedBy: {
               userId: new ObjectId(userId),
-              username: 'api_user'
+              at: new Date()
             },
-            acknowledgedAt: new Date(),
             updatedAt: new Date()
           }
         },
         { returnDocument: 'after' }
       );
-
-      return result.value ? this._formatAlert(result.value) : null;
->>>>>>> cef979a9d3c0b7abcc524caf7fa6fdbb5feeaded
+      const updatedAlert = result.value || result;
+      return updatedAlert ? this.formatAlert(updatedAlert) : null;
     } catch (error) {
-      logger.error('Failed to mark alert as false positive:', error);
+      logger.error('Failed to mark false positive:', error);
       throw error;
     }
   }
 
-<<<<<<< HEAD
-  formatAlert(alert) {
-    return {
-      id: alert._id.toString(),
-      alert_id: alert.alert_id,
-      tx_hash: alert.tx_hash,
-      subnet_id: alert.subnet_id?.toString(),
-      threat_score: alert.threat_score,
-      threat_level: alert.threat_level,
-      explanation: alert.explanation,
-      transaction_data: alert.transaction_data,
-      notification_channels: alert.notification_channels,
-      notification_sent: alert.notification_sent,
-      acknowledged: alert.acknowledged,
-      false_positive: alert.false_positive,
-      acknowledged_by: alert.acknowledged_by?.toString(),
-      acknowledged_at: alert.acknowledged_at,
-      created_at: alert.created_at,
-      updated_at: alert.updated_at
-    };
-  }
-
-=======
->>>>>>> cef979a9d3c0b7abcc524caf7fa6fdbb5feeaded
-  // Statistics
   async getSubnetStats(subnetId) {
     try {
       const subnetObjectId = new ObjectId(subnetId);
@@ -636,14 +440,7 @@ class Database {
         totalTransactions,
         successfulTransactions,
         totalThreats,
-<<<<<<< HEAD
-        criticalThreats,
-        highThreats,
-        mediumThreats,
-        lowThreats,
-=======
         threatsByLevel,
->>>>>>> cef979a9d3c0b7abcc524caf7fa6fdbb5feeaded
         totalAlerts,
         acknowledgedAlerts,
         falsePositives,
@@ -652,56 +449,6 @@ class Database {
         todayThreats,
         todayAlerts
       ] = await Promise.all([
-<<<<<<< HEAD
-        this.db.collection('transactions').countDocuments({ subnet_id: subnetObjectId }),
-        this.db.collection('transactions').countDocuments({ subnet_id: subnetObjectId, status: true }),
-        this.db.collection('threat_analyses').countDocuments({ subnet_id: subnetObjectId }),
-        this.db.collection('threat_analyses').countDocuments({ subnet_id: subnetObjectId, threat_level: 'CRITICAL' }),
-        this.db.collection('threat_analyses').countDocuments({ subnet_id: subnetObjectId, threat_level: 'HIGH' }),
-        this.db.collection('threat_analyses').countDocuments({ subnet_id: subnetObjectId, threat_level: 'MEDIUM' }),
-        this.db.collection('threat_analyses').countDocuments({ subnet_id: subnetObjectId, threat_level: 'LOW' }),
-        this.db.collection('alerts').countDocuments({ subnet_id: subnetObjectId }),
-        this.db.collection('alerts').countDocuments({ subnet_id: subnetObjectId, acknowledged: true }),
-        this.db.collection('alerts').countDocuments({ subnet_id: subnetObjectId, false_positive: true }),
-        this.db.collection('threat_analyses').aggregate([
-          { $match: { subnet_id: subnetObjectId } },
-          { $group: { _id: null, avg: { $avg: '$final_score' } } }
-        ]).toArray(),
-        this.db.collection('transactions').countDocuments({
-          subnet_id: subnetObjectId,
-          created_at: { $gte: new Date(new Date().setHours(0, 0, 0, 0)) }
-        }),
-        this.db.collection('threat_analyses').countDocuments({
-          subnet_id: subnetObjectId,
-          created_at: { $gte: new Date(new Date().setHours(0, 0, 0, 0)) }
-        }),
-        this.db.collection('alerts').countDocuments({
-          subnet_id: subnetObjectId,
-          created_at: { $gte: new Date(new Date().setHours(0, 0, 0, 0)) }
-        })
-      ]);
-
-      return {
-        total_transactions: totalTransactions,
-        successful_transactions: successfulTransactions,
-        failed_transactions: totalTransactions - successfulTransactions,
-        total_threats: totalThreats,
-        critical_threats: criticalThreats,
-        critical_alerts: criticalThreats,
-        high_threats: highThreats,
-        high_alerts: highThreats,
-        medium_threats: mediumThreats,
-        medium_alerts: mediumThreats,
-        low_threats: lowThreats,
-        low_alerts: lowThreats,
-        total_alerts: totalAlerts,
-        acknowledged_alerts: acknowledgedAlerts,
-        false_positive_alerts: falsePositives,
-        avg_threat_score: avgThreatScore.length > 0 ? avgThreatScore[0].avg || 0 : 0,
-        today_transactions: todayTransactions,
-        today_threats: todayThreats,
-        today_alerts: todayAlerts
-=======
         this.db.collection('transactions').countDocuments({ 'subnet.subnetId': subnetObjectId }),
         this.db.collection('transactions').countDocuments({ 'subnet.subnetId': subnetObjectId, status: true }),
         this.db.collection('threat_analyses').countDocuments({ 'subnet.subnetId': subnetObjectId }),
@@ -718,52 +465,45 @@ class Database {
         ]).toArray(),
         this.db.collection('transactions').countDocuments({
           'subnet.subnetId': subnetObjectId,
-          createdAt: {
-            $gte: new Date(new Date().setHours(0, 0, 0, 0))
-          }
+          createdAt: { $gte: new Date(new Date().setHours(0, 0, 0, 0)) }
         }),
         this.db.collection('threat_analyses').countDocuments({
           'subnet.subnetId': subnetObjectId,
-          createdAt: {
-            $gte: new Date(new Date().setHours(0, 0, 0, 0))
-          }
+          createdAt: { $gte: new Date(new Date().setHours(0, 0, 0, 0)) }
         }),
         this.db.collection('alerts').countDocuments({
           'subnet.subnetId': subnetObjectId,
-          createdAt: {
-            $gte: new Date(new Date().setHours(0, 0, 0, 0))
-          }
+          createdAt: { $gte: new Date(new Date().setHours(0, 0, 0, 0)) }
         })
       ]);
 
-      // Convert threat levels to individual counts
       const threatLevels = {
-        criticalThreats: 0,
-        highThreats: 0,
-        mediumThreats: 0,
-        lowThreats: 0
+        critical_threats: 0,
+        high_threats: 0,
+        medium_threats: 0,
+        low_threats: 0
       };
 
       threatsByLevel.forEach(item => {
-        if (item._id === 'CRITICAL') threatLevels.criticalThreats = item.count;
-        if (item._id === 'HIGH') threatLevels.highThreats = item.count;
-        if (item._id === 'MEDIUM') threatLevels.mediumThreats = item.count;
-        if (item._id === 'LOW') threatLevels.lowThreats = item.count;
+        if (item._id === 'CRITICAL') threatLevels.critical_threats = item.count;
+        if (item._id === 'HIGH') threatLevels.high_threats = item.count;
+        if (item._id === 'MEDIUM') threatLevels.medium_threats = item.count;
+        if (item._id === 'LOW') threatLevels.low_threats = item.count;
       });
 
       return {
-        totalTransactions,
-        successfulTransactions,
-        totalThreats,
+        total_transactions: totalTransactions,
+        successful_transactions: successfulTransactions,
+        failed_transactions: totalTransactions - successfulTransactions,
+        total_threats: totalThreats,
         ...threatLevels,
-        totalAlerts,
-        acknowledgedAlerts,
-        falsePositives,
-        avgThreatScore: avgThreatScore[0]?.avg || 0,
-        todayTransactions,
-        todayThreats,
-        todayAlerts
->>>>>>> cef979a9d3c0b7abcc524caf7fa6fdbb5feeaded
+        total_alerts: totalAlerts,
+        acknowledged_alerts: acknowledgedAlerts,
+        false_positive_alerts: falsePositives,
+        avg_threat_score: avgThreatScore[0]?.avg || 0,
+        today_transactions: todayTransactions,
+        today_threats: todayThreats,
+        today_alerts: todayAlerts
       };
     } catch (error) {
       logger.error('Failed to get subnet stats:', error);
@@ -771,8 +511,8 @@ class Database {
     }
   }
 
-  // Formatting helpers (convert MongoDB documents to PostgreSQL-like format for compatibility)
-  _formatSubnet(subnet) {
+  // Formatting helpers
+  formatSubnet(subnet) {
     return {
       id: subnet._id.toString(),
       name: subnet.name,
@@ -788,7 +528,7 @@ class Database {
     };
   }
 
-  _formatTransaction(tx) {
+  formatTransaction(tx) {
     return {
       id: tx._id.toString(),
       tx_hash: tx.txHash,
@@ -809,7 +549,7 @@ class Database {
     };
   }
 
-  _formatAlert(alert) {
+  formatAlert(alert) {
     return {
       id: alert._id.toString(),
       alert_id: alert.alertId,
@@ -833,11 +573,7 @@ class Database {
   async close() {
     if (this.client) {
       await this.client.close();
-<<<<<<< HEAD
-      logger.info('Database connection closed');
-=======
       logger.info('MongoDB connection closed');
->>>>>>> cef979a9d3c0b7abcc524caf7fa6fdbb5feeaded
     }
   }
 }
