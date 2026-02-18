@@ -4,8 +4,12 @@ import logging
 from datetime import datetime
 import asyncio
 from typing import Optional
+from dotenv import load_dotenv
 
-from app.models import AnalysisRequest, AnalysisResponse, HealthResponse, TransactionInput
+# Load environment variables
+load_dotenv()
+
+from app.schemas import AnalysisRequest, AnalysisResponse, HealthResponse, TransactionInput
 from app.database import get_database, init_db, close_db
 from app.analyzer import AIThreatAnalyzer
 

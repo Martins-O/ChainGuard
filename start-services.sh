@@ -21,7 +21,7 @@ echo ""
 
 # Start databases
 echo -e "${YELLOW}Starting databases (Redis, Postgres, MongoDB)...${NC}"
-docker-compose up -d redis postgres mongodb
+docker-compose up -d redis mongodb
 sleep 5
 echo -e "${GREEN}✓ Databases started${NC}"
 echo ""
@@ -76,7 +76,7 @@ check_service() {
     local name=$1
     local url=$2
     local log_name=$3
-    local attempts=15
+    local attempts=30
     local count=0
 
     while [ $count -lt $attempts ]; do

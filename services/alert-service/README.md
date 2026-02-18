@@ -86,7 +86,7 @@ Test notification channels.
 ### Environment Variables
 
 #### Database
-- `DATABASE_URL`: MongoDB connection string
+- `MONGODB_URL`: MongoDB connection string
 
 #### Redis
 - `REDIS_URL`: Redis connection string

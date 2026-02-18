@@ -11,6 +11,11 @@ import logging
 
 logger = logging.getLogger(__name__)
 
+from dotenv import load_dotenv
+
+# Load environment variables
+load_dotenv()
+
 # MongoDB connection URL
 MONGODB_URL = os.getenv("MONGODB_URL", "mongodb://chainguard:chainguard_password@localhost:27017/chainguard")
 
@@ -30,7 +35,7 @@ class Database:
             self.db = self.client.chainguard
 
             # Test connection
-            await self.client.admin.command('ping')
+            await self.db.command('ping')
             logger.info("Successfully connected to MongoDB")
 
             # Ensure indexes exist

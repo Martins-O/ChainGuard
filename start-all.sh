@@ -221,7 +221,7 @@ check_service() {
     local name=$1
     local url=$2
     local log_name=$3
-    local max_attempts=15
+    local max_attempts=30
     local attempt=1
 
     while [ $attempt -le $max_attempts ]; do

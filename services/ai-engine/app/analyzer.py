@@ -18,7 +18,7 @@ from datetime import datetime
 import os
 import numpy as np
 
-from app.models import TransactionInput, ThreatAnalysis, ThreatLevel, ModelScores
+from app.schemas import TransactionInput, ThreatAnalysis, ThreatLevel, ModelScores
 from app.database import get_database
 from app.feature_extractor import TransactionFeatureExtractor
 from app.models.signature_detection import SignatureDetectionDNN

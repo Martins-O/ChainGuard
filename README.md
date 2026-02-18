@@ -10,7 +10,7 @@ ChainGuard AI provides comprehensive security monitoring for Avalanche blockchai
 - **AI Threat Analysis** (Python) - Multi-model security analysis  
 - **Intelligent Alerting** (Node.js) - Smart notification routing
 - **RESTful API** (Node.js) - Complete management interface
-- **MongoDB Database** - Scalable data persistence
+- **MongoDB Database** - Flexible and scalable data persistence
 
 ## 🏗️ Architecture
 
@@ -26,6 +26,8 @@ ChainGuard AI provides comprehensive security monitoring for Avalanche blockchai
 │   MongoDB       │    │   (Python)      │    │ Alert Service  │
 │   Database      │────│                  │────│  (Node.js)     │
 │                 │    │  • Signature    │    │  • Slack       │
+│                 │    │  • Anomaly      │    │  • Email       │
+│                 │    │  • Behavioral  │    │  • SMS         │
 └─────────────────┘    │  • Anomaly      │    │  • Email       │
                               │  • Behavioral  │    │  • SMS         │
                               └──────────────────┘    └─────────────────┘
@@ -370,7 +372,7 @@ lsof -ti:5173 | xargs kill -9  # Frontend
 
 ### 5️⃣ MongoDB Database
 - **Port**: 27018 (remapped from 27017 to avoid conflicts)
-- **Features**: Document storage for users and alerts
+- **Features**: Document storage for users, subnets, and alerts
 - **Connection**: `mongodb://chainguard:chainguard_password@localhost:27018/chainguard?authSource=admin`
 
 ### 6️⃣ Frontend Dashboard
@@ -648,10 +650,11 @@ netstat -tulpn | grep :3000
 **Database connection issues**
 ```bash
 # Test database connection
-docker-compose exec mongodb mongosh -u chainguard -p chainguard_password --authenticationDatabase admin chainguard
+# Check collections
+mongosh "mongodb://chainguard:chainguard_password@localhost:27018/chainguard?authSource=admin"
 
-# Check migrations
-docker-compose exec mongodb mongosh -u chainguard -p chainguard_password --authenticationDatabase admin chainguard --eval "show collections"
+# Check collections
+# (inside mongosh) show collections
 ```
 
 **High memory usage**

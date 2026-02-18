@@ -53,10 +53,9 @@ app.get('/health', async (req, res) => {
   try {
     const db = app.locals.database;
     let dbStatus = 'disconnected';
-    
-    if (db && db.db) {
+    if (db) {
       try {
-        await db.db.admin().ping();
+        await db.client.db().command({ ping: 1 });
         dbStatus = 'connected';
       } catch (error) {
         dbStatus = 'error';
@@ -144,21 +143,21 @@ app.use((error, req, res, next) => {
 // Graceful shutdown
 process.on('SIGTERM', async () => {
   logger.info('SIGTERM received, shutting down gracefully...');
-  
+
   if (app.locals.database) {
     await app.locals.database.close();
   }
-  
+
   process.exit(0);
 });
 
 process.on('SIGINT', async () => {
   logger.info('SIGINT received, shutting down gracefully...');
-  
+
   if (app.locals.database) {
     await app.locals.database.close();
   }
-  
+
   process.exit(0);
 });
 
@@ -169,12 +168,12 @@ async function startServer() {
     const database = new Database();
     await database.initialize();
     app.locals.database = database;
-    
+
     // Start HTTP server
     app.listen(PORT, () => {
       logger.info(`ChainGuard API Server started on port ${PORT}`);
     });
-    
+
   } catch (error) {
     logger.error('Failed to start server:', error);
     process.exit(1);
