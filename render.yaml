@@ -40,7 +40,7 @@ services:
       - key: ALERT_SERVICE_URL
         fromService:
           name: chainguard-alert-service
-          type: pserv
+          type: web
           property: host
 
   # ─── AI Engine (Private Web Service) ──────────────────────────────────────
@@ -68,14 +68,15 @@ services:
       - key: PYTHONPATH
         value: /app
 
-  # ─── Alert Service (Private Service) ──────────────────────────────────────
-  - type: pserv
+  # ─── Alert Service (Web Service — free plan doesn't support pserv) ────────
+  - type: web
     name: chainguard-alert-service
     runtime: node
     plan: free
     rootDir: services/alert-service
     buildCommand: npm install
     startCommand: node src/index.js
+    healthCheckPath: /health
     envVars:
       - key: NODE_ENV
         value: production
@@ -118,13 +119,14 @@ services:
       - key: SMS_RECIPIENTS
         sync: false
 
-  # ─── Ingestion Worker (Background Worker) ─────────────────────────────────
-  - type: worker
+  # ─── Ingestion Worker (Web Service — free plan doesn't support worker) ────
+  - type: web
     name: chainguard-ingestion
     runtime: docker
     plan: free
     rootDir: services/ingestion
     dockerfilePath: ./Dockerfile
+    healthCheckPath: /health
     envVars:
       - key: REDIS_URL
         fromService:
@@ -133,3 +135,5 @@ services:
           property: connectionString
       - key: RUST_LOG
         value: info
+      - key: METRICS_PORT
+        value: 9000
