@@ -1,0 +1,135 @@
+services:
+
+  # ─── Redis (Managed) ──────────────────────────────────────────────────────
+  - type: redis
+    name: chainguard-redis
+    plan: free
+    maxmemoryPolicy: allkeys-lru
+    ipAllowList: []   # internal only
+
+  # ─── API Server (Public Web Service) ──────────────────────────────────────
+  - type: web
+    name: chainguard-api-server
+    runtime: node
+    plan: free
+    rootDir: services/api-server
+    buildCommand: npm install
+    startCommand: node src/index.js
+    healthCheckPath: /health
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: 3000
+      - key: LOG_LEVEL
+        value: info
+      - key: MONGODB_URL
+        sync: false           # Set in Render dashboard
+      - key: JWT_SECRET
+        generateValue: true   # Auto-generate a secure secret
+      - key: REDIS_URL
+        fromService:
+          name: chainguard-redis
+          type: redis
+          property: connectionString
+      - key: AI_ENGINE_URL
+        fromService:
+          name: chainguard-ai-engine
+          type: web
+          property: host
+      - key: ALERT_SERVICE_URL
+        fromService:
+          name: chainguard-alert-service
+          type: pserv
+          property: host
+
+  # ─── AI Engine (Private Web Service) ──────────────────────────────────────
+  - type: web
+    name: chainguard-ai-engine
+    runtime: docker
+    plan: free
+    rootDir: services/ai-engine
+    dockerfilePath: ./Dockerfile
+    healthCheckPath: /health
+    envVars:
+      - key: MONGODB_URL
+        sync: false           # Set in Render dashboard
+      - key: REDIS_URL
+        fromService:
+          name: chainguard-redis
+          type: redis
+          property: connectionString
+      - key: THREAT_THRESHOLD
+        value: 70
+      - key: MODEL_PATH
+        value: /app/models
+      - key: LOG_LEVEL
+        value: INFO
+      - key: PYTHONPATH
+        value: /app
+
+  # ─── Alert Service (Private Service) ──────────────────────────────────────
+  - type: pserv
+    name: chainguard-alert-service
+    runtime: node
+    plan: free
+    rootDir: services/alert-service
+    buildCommand: npm install
+    startCommand: node src/index.js
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: 3001
+      - key: LOG_LEVEL
+        value: info
+      - key: MONGODB_URL
+        sync: false           # Set in Render dashboard
+      - key: REDIS_URL
+        fromService:
+          name: chainguard-redis
+          type: redis
+          property: connectionString
+      # Notification channels — set these in Render dashboard
+      - key: SLACK_WEBHOOK_URL
+        sync: false
+      - key: DISCORD_WEBHOOK_URL
+        sync: false
+      - key: SENDGRID_API_KEY
+        sync: false
+      - key: ALERT_EMAIL_RECIPIENTS
+        sync: false
+      - key: EMAIL_FROM
+        sync: false
+      - key: SMTP_HOST
+        sync: false
+      - key: SMTP_PORT
+        sync: false
+      - key: SMTP_USER
+        sync: false
+      - key: SMTP_PASS
+        sync: false
+      - key: TWILIO_ACCOUNT_SID
+        sync: false
+      - key: TWILIO_AUTH_TOKEN
+        sync: false
+      - key: TWILIO_PHONE_NUMBER
+        sync: false
+      - key: SMS_RECIPIENTS
+        sync: false
+
+  # ─── Ingestion Worker (Background Worker) ─────────────────────────────────
+  - type: worker
+    name: chainguard-ingestion
+    runtime: docker
+    plan: free
+    rootDir: services/ingestion
+    dockerfilePath: ./Dockerfile
+    envVars:
+      - key: REDIS_URL
+        fromService:
+          name: chainguard-redis
+          type: redis
+          property: connectionString
+      - key: RUST_LOG
+        value: info
