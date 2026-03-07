@@ -9,11 +9,12 @@ jobs:
   ping-services:
     runs-on: ubuntu-latest
     steps:
-      - name: Ping API Server
-        run: curl -s -o /dev/null -w "%{http_code}" https://chainguard-api-server.onrender.com/health
-
-      - name: Ping AI Engine
-        run: curl -s -o /dev/null -w "%{http_code}" https://chainguard-ai-engine.onrender.com/health
-
-      - name: Ping Alert Service
-        run: curl -s -o /dev/null -w "%{http_code}" https://chainguard-alert-service.onrender.com/health
+      - name: Keep-alive ping loop
+        run: |
+          for i in {1..7}; do
+            echo "Ping round $i/7"
+            curl -s -o /dev/null -w "API: %{http_code}\n" https://chainguard-api-server.onrender.com/health || true
+            curl -s -o /dev/null -w "AI: %{http_code}\n" https://chainguard-ai-engine.onrender.com/health || true
+            curl -s -o /dev/null -w "Alert: %{http_code}\n" https://chainguard-alert-service.onrender.com/health || true
+            sleep 40
+          done

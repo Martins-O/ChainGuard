@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { api, aiEngineAPI, alertServiceAPI, ingestionAPI } from '../services/api'
+import api, { aiEngineAPI, alertServiceAPI, ingestionAPI } from '../services/api'
 import { Server, CheckCircle, XCircle, Loader } from 'lucide-react'
 
 const ServiceStatus = () => {

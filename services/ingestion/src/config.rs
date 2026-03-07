@@ -36,11 +36,18 @@ pub struct MonitoringConfig {
 }
 
 #[derive(Debug, Deserialize, Clone)]
+pub struct MongoConfig {
+    pub url: String,
+    pub database: String,
+}
+
+#[derive(Debug, Deserialize, Clone)]
 pub struct Config {
     pub general: GeneralConfig,
     pub avalanche: AvalancheConfig,
     pub redis: RedisConfig,
     pub monitoring: MonitoringConfig,
+    pub mongodb: Option<MongoConfig>,
 }
 
 impl Config {
@@ -51,6 +58,13 @@ impl Config {
     }
 
     pub fn from_env() -> Result<Self> {
+        let mongodb_url = std::env::var("MONGODB_URL").ok();
+        let mongodb = mongodb_url.map(|url| MongoConfig {
+            url,
+            database: std::env::var("MONGODB_DATABASE")
+                .unwrap_or_else(|_| "chainguard".to_string()),
+        });
+
         Ok(Config {
             general: GeneralConfig {
                 log_level: std::env::var("LOG_LEVEL").unwrap_or_else(|_| "info".to_string()),
@@ -107,6 +121,7 @@ impl Config {
                     .and_then(|s| s.parse().ok())
                     .unwrap_or(30),
             },
+            mongodb,
         })
     }
 }

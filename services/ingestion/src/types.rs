@@ -12,11 +12,14 @@ pub struct NormalizedTransaction {
     pub gas_limit: String,
     pub gas_price: Option<String>,
     pub timestamp: chrono::DateTime<chrono::Utc>,
-    pub block_number: u64,
-    pub transaction_index: u32,
+    pub block_number: Option<u64>,
+    pub transaction_index: Option<u32>,
     pub decoded_call: Option<DecodedCall>,
     pub logs: Vec<TransactionLog>,
     pub status: bool,
+    pub chain_id: String,
+    pub nonce: Option<u64>,
+    pub raw: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

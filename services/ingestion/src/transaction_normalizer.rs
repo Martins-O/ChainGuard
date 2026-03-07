@@ -89,11 +89,14 @@ impl TransactionNormalizer {
             gas_limit,
             gas_price,
             timestamp,
-            block_number,
-            transaction_index,
+            block_number: Some(block_number),
+            transaction_index: Some(transaction_index),
             decoded_call,
             logs: normalized_logs,
             status,
+            chain_id: String::new(),
+            nonce: None,
+            raw: None,
         })
     }
 

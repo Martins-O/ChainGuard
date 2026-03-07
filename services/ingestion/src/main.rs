@@ -5,6 +5,7 @@ mod transaction_normalizer;
 mod redis_producer;
 mod metrics;
 mod ingestion_service;
+mod subnet_repository;
 
 use anyhow::Result;
 use axum::{Router, routing::get};
