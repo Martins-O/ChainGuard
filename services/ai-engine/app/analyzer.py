@@ -91,6 +91,32 @@ class AIThreatAnalyzer:
             logger.error(f"Failed to initialize AI Threat Analyzer: {e}")
             raise
 
+    def _normalize_transaction_fields(self, data: Dict[str, Any]) -> Dict[str, Any]:
+        """Normalize field names from Rust ingestion format to Python format"""
+        field_mapping = {
+            'tx_hash': 'hash',
+            'from': 'from',
+            'to': 'to',
+            'value': 'value',
+            'gas_limit': 'gas',
+            'gas_price': 'gasPrice',
+            'gas_used': 'gasUsed',
+            'block_number': 'blockNumber',
+            'transaction_index': 'transactionIndex',
+            'chain_id': 'chainId',
+            'timestamp': 'timestamp',
+            'nonce': 'nonce',
+            'raw': 'input',
+            'status': 'status',
+        }
+        
+        normalized = {}
+        for key, value in data.items():
+            new_key = field_mapping.get(key, key)
+            normalized[new_key] = value
+        
+        return normalized
+
     async def analyze_transaction(self, transaction_data: Dict[str, Any]) -> ThreatAnalysis:
         """
         Analyze a single transaction using all ML models
@@ -185,11 +211,14 @@ class AIThreatAnalyzer:
                 if result:
                     _, message = result
                     transaction_data = json.loads(message)
+                    
+                    # Normalize field names from Rust format to Python format
+                    transaction_data = self._normalize_transaction_fields(transaction_data)
 
                     # Analyze transaction
                     analysis = await self.analyze_transaction(transaction_data)
 
-                    logger.debug(
+                    logger.info(
                         f"Processed {analysis.tx_hash}: "
                         f"Score={analysis.final_score:.1f}, "
                         f"Level={analysis.threat_level.value}"
