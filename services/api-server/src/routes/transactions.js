@@ -1,6 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const { auth } = require('../middleware/auth');
+const { handleError } = require('../middleware/errorHandler');
 
 // GET /subnets/:id/transactions - Get transactions for a subnet
 router.get('/:id/transactions', 
@@ -8,12 +9,13 @@ router.get('/:id/transactions',
   async (req, res) => {
     try {
       const db = req.app.locals.database;
-      const subnetId = parseInt(req.params.id);
+      const { ObjectId } = require('mongodb');
+      const subnetId = req.params.id;
 
-      if (isNaN(subnetId)) {
+      if (!ObjectId.isValid(subnetId)) {
         return res.status(400).json({
           success: false,
-          error: 'Invalid subnet ID'
+          error: 'Invalid subnet ID format. Please check the URL and try again.'
         });
       }
 
@@ -22,7 +24,7 @@ router.get('/:id/transactions',
       if (!subnet) {
         return res.status(404).json({
           success: false,
-          error: 'Subnet not found'
+          error: 'Subnet not found. It may have been deleted or the ID is incorrect.'
         });
       }
 
@@ -48,11 +50,7 @@ router.get('/:id/transactions',
         }
       });
     } catch (error) {
-      console.error('Get transactions error:', error);
-      res.status(500).json({
-        success: false,
-        error: 'Failed to retrieve transactions'
-      });
+      handleError(res, error, 'Get transactions');
     }
   }
 );
@@ -69,7 +67,7 @@ router.get('/:hash',
       if (!txHash.match(/^0x[a-fA-F0-9]{64}$/)) {
         return res.status(400).json({
           success: false,
-          error: 'Invalid transaction hash format'
+          error: 'Invalid transaction hash format. Expected a 64-character hex string starting with 0x.'
         });
       }
 
@@ -78,7 +76,7 @@ router.get('/:hash',
       if (!transaction) {
         return res.status(404).json({
           success: false,
-          error: 'Transaction not found'
+          error: 'Transaction not found. It may not exist in the database yet.'
         });
       }
 
@@ -87,11 +85,7 @@ router.get('/:hash',
         data: transaction
       });
     } catch (error) {
-      console.error('Get transaction error:', error);
-      res.status(500).json({
-        success: false,
-        error: 'Failed to retrieve transaction'
-      });
+      handleError(res, error, 'Get transaction');
     }
   }
 );

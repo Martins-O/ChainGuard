@@ -1,6 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const { auth } = require('../middleware/auth');
+const { handleError } = require('../middleware/errorHandler');
 
 // GET /subnets/:id/stats - Get statistics for a subnet
 router.get('/:id/stats', 
@@ -8,12 +9,13 @@ router.get('/:id/stats',
   async (req, res) => {
     try {
       const db = req.app.locals.database;
-      const subnetId = parseInt(req.params.id);
+      const { ObjectId } = require('mongodb');
+      const subnetId = req.params.id;
 
-      if (isNaN(subnetId)) {
+      if (!ObjectId.isValid(subnetId)) {
         return res.status(400).json({
           success: false,
-          error: 'Invalid subnet ID'
+          error: 'Invalid subnet ID format. Please check the URL and try again.'
         });
       }
 
@@ -22,7 +24,7 @@ router.get('/:id/stats',
       if (!subnet) {
         return res.status(404).json({
           success: false,
-          error: 'Subnet not found'
+          error: 'Subnet not found. It may have been deleted or the ID is incorrect.'
         });
       }
 
@@ -40,11 +42,7 @@ router.get('/:id/stats',
         }
       });
     } catch (error) {
-      console.error('Get stats error:', error);
-      res.status(500).json({
-        success: false,
-        error: 'Failed to retrieve statistics'
-      });
+      handleError(res, error, 'Get stats');
     }
   }
 );

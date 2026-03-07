@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const { subnetValidation, subnetUpdateValidation, handleValidationErrors } = require('../middleware/validation');
 const { auth, adminOnly } = require('../middleware/auth');
+const { handleError } = require('../middleware/errorHandler');
 
 // POST /subnets - Create new subnet
 router.post('/', 
@@ -21,7 +22,7 @@ router.post('/',
       if (duplicate) {
         return res.status(409).json({
           success: false,
-          error: 'Subnet with this chain ID already exists'
+          error: 'A subnet with this Chain ID already exists. Please use a different Chain ID.'
         });
       }
 
@@ -39,11 +40,7 @@ router.post('/',
         data: subnet
       });
     } catch (error) {
-      console.error('Create subnet error:', error);
-      res.status(500).json({
-        success: false,
-        error: 'Failed to create subnet'
-      });
+      handleError(res, error, 'Create subnet');
     }
   }
 );
@@ -73,11 +70,7 @@ router.get('/',
         }
       });
     } catch (error) {
-      console.error('Get subnets error:', error);
-      res.status(500).json({
-        success: false,
-        error: 'Failed to retrieve subnets'
-      });
+      handleError(res, error, 'Get subnets');
     }
   }
 );
@@ -94,7 +87,7 @@ router.get('/:id',
       if (!ObjectId.isValid(subnetId)) {
         return res.status(400).json({
           success: false,
-          error: 'Invalid subnet ID format'
+          error: 'Invalid subnet ID format. Please check the URL and try again.'
         });
       }
 
@@ -103,7 +96,7 @@ router.get('/:id',
       if (!subnet) {
         return res.status(404).json({
           success: false,
-          error: 'Subnet not found'
+          error: 'Subnet not found. It may have been deleted or the ID is incorrect.'
         });
       }
 
@@ -112,11 +105,7 @@ router.get('/:id',
         data: subnet
       });
     } catch (error) {
-      console.error('Get subnet error:', error);
-      res.status(500).json({
-        success: false,
-        error: 'Failed to retrieve subnet'
-      });
+      handleError(res, error, 'Get subnet');
     }
   }
 );
@@ -136,7 +125,7 @@ router.patch('/:id',
       if (!ObjectId.isValid(subnetId)) {
         return res.status(400).json({
           success: false,
-          error: 'Invalid subnet ID format'
+          error: 'Invalid subnet ID format. Please check the URL and try again.'
         });
       }
 
@@ -145,7 +134,7 @@ router.patch('/:id',
       if (!existingSubnet) {
         return res.status(404).json({
           success: false,
-          error: 'Subnet not found'
+          error: 'Subnet not found. It may have been deleted or the ID is incorrect.'
         });
       }
 
@@ -166,11 +155,7 @@ router.patch('/:id',
         data: updatedSubnet
       });
     } catch (error) {
-      console.error('Update subnet error:', error);
-      res.status(500).json({
-        success: false,
-        error: 'Failed to update subnet'
-      });
+      handleError(res, error, 'Update subnet');
     }
   }
 );
@@ -189,7 +174,7 @@ router.delete('/:id',
       if (!ObjectId.isValid(subnetId)) {
         return res.status(400).json({
           success: false,
-          error: 'Invalid subnet ID format'
+          error: 'Invalid subnet ID format. Please check the URL and try again.'
         });
       }
 
@@ -198,7 +183,7 @@ router.delete('/:id',
       if (!existingSubnet) {
         return res.status(404).json({
           success: false,
-          error: 'Subnet not found'
+          error: 'Subnet not found. It may have already been deleted.'
         });
       }
 
@@ -209,11 +194,7 @@ router.delete('/:id',
         data: deletedSubnet
       });
     } catch (error) {
-      console.error('Delete subnet error:', error);
-      res.status(500).json({
-        success: false,
-        error: 'Failed to delete subnet'
-      });
+      handleError(res, error, 'Delete subnet');
     }
   }
 );

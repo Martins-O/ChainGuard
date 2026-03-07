@@ -1,6 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const { auth } = require('../middleware/auth');
+const { handleError } = require('../middleware/errorHandler');
 
 // GET /subnets/:id/alerts - Get alerts for a subnet
 router.get('/:id/alerts', 
@@ -8,12 +9,13 @@ router.get('/:id/alerts',
   async (req, res) => {
     try {
       const db = req.app.locals.database;
-      const subnetId = parseInt(req.params.id);
+      const { ObjectId } = require('mongodb');
+      const subnetId = req.params.id;
 
-      if (isNaN(subnetId)) {
+      if (!ObjectId.isValid(subnetId)) {
         return res.status(400).json({
           success: false,
-          error: 'Invalid subnet ID'
+          error: 'Invalid subnet ID format. Please check the URL and try again.'
         });
       }
 
@@ -22,7 +24,7 @@ router.get('/:id/alerts',
       if (!subnet) {
         return res.status(404).json({
           success: false,
-          error: 'Subnet not found'
+          error: 'Subnet not found. It may have been deleted or the ID is incorrect.'
         });
       }
 
@@ -47,87 +49,79 @@ router.get('/:id/alerts',
         }
       });
     } catch (error) {
-      console.error('Get alerts error:', error);
-      res.status(500).json({
-        success: false,
-        error: 'Failed to retrieve alerts'
-      });
+      handleError(res, error, 'Get alerts');
     }
   }
 );
 
 // PATCH /alerts/:id/acknowledge - Acknowledge an alert
 router.patch('/alerts/:id/acknowledge', 
-  auth, 
+  auth,
   async (req, res) => {
     try {
       const db = req.app.locals.database;
-      const alertId = parseInt(req.params.id);
+      const { ObjectId } = require('mongodb');
+      const alertId = req.params.id;
 
-      if (isNaN(alertId)) {
+      if (!ObjectId.isValid(alertId)) {
         return res.status(400).json({
           success: false,
-          error: 'Invalid alert ID'
+          error: 'Invalid alert ID format.'
         });
       }
 
-      const acknowledgedAlert = await db.acknowledgeAlert(alertId, req.user.userId);
-
-      if (!acknowledgedAlert) {
+      const alert = await db.getAlertById(alertId);
+      if (!alert) {
         return res.status(404).json({
           success: false,
-          error: 'Alert not found'
+          error: 'Alert not found. It may have already been resolved.'
         });
       }
 
-      res.json({
-        success: true,
-        data: acknowledgedAlert
-      });
-    } catch (error) {
-      console.error('Acknowledge alert error:', error);
-      res.status(500).json({
-        success: false,
-        error: 'Failed to acknowledge alert'
-      });
-    }
-  }
-);
-
-// POST /alerts/:id/false-positive - Mark alert as false positive
-router.post('/alerts/:id/false-positive', 
-  auth, 
-  async (req, res) => {
-    try {
-      const db = req.app.locals.database;
-      const alertId = parseInt(req.params.id);
-
-      if (isNaN(alertId)) {
-        return res.status(400).json({
-          success: false,
-          error: 'Invalid alert ID'
-        });
-      }
-
-      const updatedAlert = await db.markFalsePositive(alertId, req.user.userId);
-
-      if (!updatedAlert) {
-        return res.status(404).json({
-          success: false,
-          error: 'Alert not found'
-        });
-      }
+      const updatedAlert = await db.acknowledgeAlert(alertId, req.user.userId);
 
       res.json({
         success: true,
         data: updatedAlert
       });
     } catch (error) {
-      console.error('Mark false positive error:', error);
-      res.status(500).json({
-        success: false,
-        error: 'Failed to mark alert as false positive'
+      handleError(res, error, 'Acknowledge alert');
+    }
+  }
+);
+
+// POST /alerts/:id/false-positive - Mark alert as false positive
+router.post('/alerts/:id/false-positive', 
+  auth,
+  async (req, res) => {
+    try {
+      const db = req.app.locals.database;
+      const { ObjectId } = require('mongodb');
+      const alertId = req.params.id;
+
+      if (!ObjectId.isValid(alertId)) {
+        return res.status(400).json({
+          success: false,
+          error: 'Invalid alert ID format.'
+        });
+      }
+
+      const alert = await db.getAlertById(alertId);
+      if (!alert) {
+        return res.status(404).json({
+          success: false,
+          error: 'Alert not found. It may have already been resolved.'
+        });
+      }
+
+      const updatedAlert = await db.markFalsePositive(alertId, req.user.userId);
+
+      res.json({
+        success: true,
+        data: updatedAlert
       });
+    } catch (error) {
+      handleError(res, error, 'Mark false positive');
     }
   }
 );

@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const { loginValidation, registerValidation, handleValidationErrors } = require('../middleware/validation');
 const limits = require('../middleware/rateLimiting');
+const { handleError } = require('../middleware/errorHandler');
 
 // POST /auth/login - User login
 router.post('/login', 
@@ -19,7 +20,7 @@ router.post('/login',
       if (!user) {
         return res.status(401).json({
           success: false,
-          error: 'Invalid credentials'
+          error: 'Invalid username or password'
         });
       }
 
@@ -29,7 +30,7 @@ router.post('/login',
       if (!isValidPassword) {
         return res.status(401).json({
           success: false,
-          error: 'Invalid credentials'
+          error: 'Invalid username or password'
         });
       }
 
@@ -37,7 +38,7 @@ router.post('/login',
       if (!user.is_active) {
         return res.status(401).json({
           success: false,
-          error: 'Account is deactivated'
+          error: 'Your account has been deactivated. Please contact an administrator.'
         });
       }
 
@@ -57,11 +58,7 @@ router.post('/login',
         }
       });
     } catch (error) {
-      console.error('Login error:', error);
-      res.status(500).json({
-        success: false,
-        error: 'Login failed'
-      });
+      handleError(res, error, 'Login');
     }
   }
 );
@@ -76,16 +73,12 @@ router.post('/register',
       const db = req.app.locals.database;
       const { username, email, password, role = 'user' } = req.body;
 
-      // For now, we'll allow registration without auth
-      // In production, you might want to require an existing admin user
-      // or implement invitation system
-
       // Check if username already exists
       const existingUser = await db.getUserByUsername(username);
       if (existingUser) {
         return res.status(409).json({
           success: false,
-          error: 'Username already exists'
+          error: 'Username already taken. Please choose a different username.'
         });
       }
 
@@ -113,19 +106,13 @@ router.post('/register',
         }
       });
     } catch (error) {
-      console.error('Registration error:', error);
-      
-      if (error.code === '23505') { // Unique violation
+      if (error.code === 11000) {
         return res.status(409).json({
           success: false,
-          error: 'Email already exists'
+          error: 'Email already registered. Please use a different email address.'
         });
       }
-
-      res.status(500).json({
-        success: false,
-        error: 'Registration failed'
-      });
+      handleError(res, error, 'Registration');
     }
   }
 );
@@ -139,7 +126,7 @@ router.post('/verify',
       if (!token) {
         return res.status(400).json({
           success: false,
-          error: 'Token is required'
+          error: 'No authentication token provided. Please log in.'
         });
       }
 
@@ -154,7 +141,7 @@ router.post('/verify',
       if (!user || !user.is_active) {
         return res.status(401).json({
           success: false,
-          error: 'Invalid token'
+          error: 'Session expired. Please log in again.'
         });
       }
 
@@ -174,7 +161,7 @@ router.post('/verify',
       console.error('Token verification error:', error);
       res.status(401).json({
         success: false,
-        error: 'Invalid token'
+        error: 'Invalid or expired session. Please log in again.'
       });
     }
   }
