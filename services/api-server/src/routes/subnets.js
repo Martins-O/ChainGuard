@@ -88,12 +88,13 @@ router.get('/:id',
   async (req, res) => {
     try {
       const db = req.app.locals.database;
-      const subnetId = parseInt(req.params.id);
+      const { ObjectId } = require('mongodb');
+      const subnetId = req.params.id;
 
-      if (isNaN(subnetId)) {
+      if (!ObjectId.isValid(subnetId)) {
         return res.status(400).json({
           success: false,
-          error: 'Invalid subnet ID'
+          error: 'Invalid subnet ID format'
         });
       }
 
@@ -129,12 +130,13 @@ router.patch('/:id',
   async (req, res) => {
     try {
       const db = req.app.locals.database;
-      const subnetId = parseInt(req.params.id);
+      const { ObjectId } = require('mongodb');
+      const subnetId = req.params.id;
 
-      if (isNaN(subnetId)) {
+      if (!ObjectId.isValid(subnetId)) {
         return res.status(400).json({
           success: false,
-          error: 'Invalid subnet ID'
+          error: 'Invalid subnet ID format'
         });
       }
 
@@ -180,12 +182,14 @@ router.delete('/:id',
   async (req, res) => {
     try {
       const db = req.app.locals.database;
-      const subnetId = parseInt(req.params.id);
+      const { ObjectId } = require('mongodb');
+      const subnetId = req.params.id;
 
-      if (isNaN(subnetId)) {
+      // Validate ObjectId format
+      if (!ObjectId.isValid(subnetId)) {
         return res.status(400).json({
           success: false,
-          error: 'Invalid subnet ID'
+          error: 'Invalid subnet ID format'
         });
       }
 
