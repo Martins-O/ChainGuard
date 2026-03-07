@@ -1,9 +1,8 @@
 use anyhow::{anyhow, Result};
-use backoff::{ExponentialBackoff, future::retry};
 use futures_util::{SinkExt, StreamExt};
 use serde_json::{json, Value};
 use std::time::Duration;
-use tokio::time::interval;
+use tokio::time::{timeout, interval, sleep};
 use tokio_tungstenite::{connect_async, tungstenite::Message, WebSocketStream};
 use tracing::{debug, error, info, warn};
 
@@ -34,29 +33,37 @@ impl WebSocketManager {
     }
     
     pub async fn connect(&mut self) -> Result<WebSocketStream<tokio_tungstenite::MaybeTlsStream<tokio::net::TcpStream>>> {
-        let operation = || async {
+        let max_retries = 5;
+        let mut retry_count = 0;
+        
+        loop {
             let url = self.get_current_url();
             info!("Attempting to connect to {}", url);
             
             match timeout(self.connection_timeout, connect_async(&url)).await {
                 Ok(Ok((ws_stream, _))) => {
                     info!("Successfully connected to {}", url);
-                    Ok(ws_stream)
+                    return Ok(ws_stream);
                 }
                 Ok(Err(e)) => {
                     error!("Failed to connect to {}: {}", url, e);
                     self.try_next_url();
-                    Err(anyhow!("WebSocket connection failed: {}", e))
                 }
                 Err(_) => {
                     error!("Connection timeout to {}", url);
                     self.try_next_url();
-                    Err(anyhow!("Connection timeout"))
                 }
             }
-        };
-        
-        retry(ExponentialBackoff::default(), operation).await
+            
+            retry_count += 1;
+            if retry_count >= max_retries {
+                return Err(anyhow!("Max retries ({}) reached for WebSocket connection", max_retries));
+            }
+            
+            let delay = Duration::from_millis(1000 * (2_u64.pow(retry_count.min(5) as u32)));
+            info!("Retrying in {}ms...", delay.as_millis());
+            sleep(delay).await;
+        }
     }
     
     pub async fn subscribe_new_pending_transactions(

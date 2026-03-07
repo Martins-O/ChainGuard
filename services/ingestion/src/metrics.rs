@@ -1,5 +1,6 @@
 use anyhow::Result;
 use prometheus::{Encoder, TextEncoder};
+use serde_json::json;
 use std::sync::Arc;
 use tokio::sync::RwLock;
 use axum::{
@@ -47,22 +48,22 @@ pub async fn metrics_handler(State(state): State<MetricsState>) -> Response {
         &["status"]
     ).unwrap();
     
-    counter.with_label_values(&["processed"]).add_metric(metrics.transactions_processed as f64);
-    counter.with_label_values(&["failed"]).add_metric(metrics.transactions_failed as f64);
+    counter.with_label_values(&["processed"]).inc_by(metrics.transactions_processed as f64);
+    counter.with_label_values(&["failed"]).inc_by(metrics.transactions_failed as f64);
     
     let reconnection_counter = prometheus::Counter::new(
         "chainguard_websocket_reconnections_total",
         "Total WebSocket reconnections"
     ).unwrap();
-    reconnection_counter.add_metric(metrics.websocket_reconnections as f64);
+    reconnection_counter.inc_by(metrics.websocket_reconnections as f64);
     
     let redis_counter = prometheus::CounterVec::new(
         prometheus::Opts::new("chainguard_redis_publishes_total", "Total Redis publishes"),
         &["status"]
     ).unwrap();
     
-    redis_counter.with_label_values(&["success"]).add_metric(metrics.redis_publishes as f64);
-    redis_counter.with_label_values(&["failed"]).add_metric(metrics.redis_publish_failures as f64);
+    redis_counter.with_label_values(&["success"]).inc_by(metrics.redis_publishes as f64);
+    redis_counter.with_label_values(&["failed"]).inc_by(metrics.redis_publish_failures as f64);
     
     let gauge = prometheus::Gauge::new(
         "chainguard_last_processed_block",

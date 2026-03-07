@@ -1,0 +1,14 @@
+/home/martins/hacks/chainGuard/services/ingestion/target/release/deps/serde-1273e714013d06f3.d: /home/martins/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.228/src/lib.rs /home/martins/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.228/src/integer128.rs /home/martins/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.228/src/private/mod.rs /home/martins/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.228/src/private/de.rs /home/martins/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.228/src/private/ser.rs /home/martins/hacks/chainGuard/services/ingestion/target/release/build/serde-04612e040ad3f8f0/out/private.rs
+
+/home/martins/hacks/chainGuard/services/ingestion/target/release/deps/libserde-1273e714013d06f3.rlib: /home/martins/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.228/src/lib.rs /home/martins/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.228/src/integer128.rs /home/martins/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.228/src/private/mod.rs /home/martins/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.228/src/private/de.rs /home/martins/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.228/src/private/ser.rs /home/martins/hacks/chainGuard/services/ingestion/target/release/build/serde-04612e040ad3f8f0/out/private.rs
+
+/home/martins/hacks/chainGuard/services/ingestion/target/release/deps/libserde-1273e714013d06f3.rmeta: /home/martins/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.228/src/lib.rs /home/martins/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.228/src/integer128.rs /home/martins/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.228/src/private/mod.rs /home/martins/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.228/src/private/de.rs /home/martins/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.228/src/private/ser.rs /home/martins/hacks/chainGuard/services/ingestion/target/release/build/serde-04612e040ad3f8f0/out/private.rs
+
+/home/martins/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.228/src/lib.rs:
+/home/martins/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.228/src/integer128.rs:
+/home/martins/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.228/src/private/mod.rs:
+/home/martins/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.228/src/private/de.rs:
+/home/martins/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde-1.0.228/src/private/ser.rs:
+/home/martins/hacks/chainGuard/services/ingestion/target/release/build/serde-04612e040ad3f8f0/out/private.rs:
+
+# env-dep:OUT_DIR=/home/martins/hacks/chainGuard/services/ingestion/target/release/build/serde-04612e040ad3f8f0/out

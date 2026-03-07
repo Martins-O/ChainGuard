@@ -1,0 +1,14 @@
+/home/martins/hacks/chainGuard/services/ingestion/target/release/deps/thiserror-74461a4493a513e4.d: /home/martins/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/thiserror-2.0.18/src/lib.rs /home/martins/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/thiserror-2.0.18/src/aserror.rs /home/martins/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/thiserror-2.0.18/src/display.rs /home/martins/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/thiserror-2.0.18/src/var.rs /home/martins/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/thiserror-2.0.18/src/private.rs /home/martins/hacks/chainGuard/services/ingestion/target/release/build/thiserror-488473ef77126fd9/out/private.rs
+
+/home/martins/hacks/chainGuard/services/ingestion/target/release/deps/libthiserror-74461a4493a513e4.rlib: /home/martins/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/thiserror-2.0.18/src/lib.rs /home/martins/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/thiserror-2.0.18/src/aserror.rs /home/martins/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/thiserror-2.0.18/src/display.rs /home/martins/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/thiserror-2.0.18/src/var.rs /home/martins/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/thiserror-2.0.18/src/private.rs /home/martins/hacks/chainGuard/services/ingestion/target/release/build/thiserror-488473ef77126fd9/out/private.rs
+
+/home/martins/hacks/chainGuard/services/ingestion/target/release/deps/libthiserror-74461a4493a513e4.rmeta: /home/martins/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/thiserror-2.0.18/src/lib.rs /home/martins/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/thiserror-2.0.18/src/aserror.rs /home/martins/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/thiserror-2.0.18/src/display.rs /home/martins/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/thiserror-2.0.18/src/var.rs /home/martins/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/thiserror-2.0.18/src/private.rs /home/martins/hacks/chainGuard/services/ingestion/target/release/build/thiserror-488473ef77126fd9/out/private.rs
+
+/home/martins/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/thiserror-2.0.18/src/lib.rs:
+/home/martins/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/thiserror-2.0.18/src/aserror.rs:
+/home/martins/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/thiserror-2.0.18/src/display.rs:
+/home/martins/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/thiserror-2.0.18/src/var.rs:
+/home/martins/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/thiserror-2.0.18/src/private.rs:
+/home/martins/hacks/chainGuard/services/ingestion/target/release/build/thiserror-488473ef77126fd9/out/private.rs:
+
+# env-dep:OUT_DIR=/home/martins/hacks/chainGuard/services/ingestion/target/release/build/thiserror-488473ef77126fd9/out

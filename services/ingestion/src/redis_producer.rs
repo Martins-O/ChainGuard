@@ -67,7 +67,7 @@ impl RedisProducer {
     pub async fn health_check(&self) -> Result<bool> {
         let mut conn = self.client.get_async_connection().await?;
         
-        let _: String = conn.ping().await?;
+        let _: String = redis::cmd("PING").query_async(&mut conn).await?;
         Ok(true)
     }
     

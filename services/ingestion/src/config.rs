@@ -5,14 +5,14 @@ use std::time::Duration;
 use tokio::time::sleep;
 use tracing::{error, info, warn};
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Clone)]
 pub struct GeneralConfig {
     pub log_level: String,
     pub max_retries: u32,
     pub retry_delay_ms: u64,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Clone)]
 pub struct AvalancheConfig {
     pub websocket_url: String,
     pub fallback_urls: Vec<String>,
@@ -20,7 +20,7 @@ pub struct AvalancheConfig {
     pub ping_interval_sec: u64,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Clone)]
 pub struct RedisConfig {
     pub url: String,
     pub connection_pool_size: u32,
@@ -29,13 +29,13 @@ pub struct RedisConfig {
     pub batch_timeout_ms: u64,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Clone)]
 pub struct MonitoringConfig {
     pub metrics_port: u16,
     pub health_check_interval_sec: u64,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Clone)]
 pub struct Config {
     pub general: GeneralConfig,
     pub avalanche: AvalancheConfig,

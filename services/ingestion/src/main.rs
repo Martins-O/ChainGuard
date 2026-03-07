@@ -7,10 +7,11 @@ mod metrics;
 mod ingestion_service;
 
 use anyhow::Result;
-use axum::Router;
+use axum::{Router, routing::get};
 use clap::Parser;
 use std::net::SocketAddr;
 use tokio::signal;
+use tokio::net::TcpListener;
 use tracing::{error, info};
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 
@@ -54,9 +55,9 @@ async fn main() -> Result<()> {
     
     // Spawn metrics server
     let metrics_handle = tokio::spawn(async move {
+        let listener = TcpListener::bind(metrics_addr).await.unwrap();
         info!("Metrics server listening on {}", metrics_addr);
-        axum::Server::bind(&metrics_addr)
-            .serve(metrics_router.into_make_service())
+        axum::serve(listener, metrics_router.into_make_service())
             .await
     });
     
