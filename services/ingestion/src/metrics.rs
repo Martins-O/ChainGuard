@@ -5,11 +5,12 @@ use std::sync::Arc;
 use tokio::sync::RwLock;
 use axum::{
     extract::State,
-    http::StatusCode,
+    http::{HeaderValue, Method, StatusCode},
     response::{IntoResponse, Response},
     routing::get,
     Router,
 };
+use tower_http::cors::{Any, CorsLayer};
 
 #[derive(Clone)]
 pub struct MetricsState {
@@ -32,9 +33,15 @@ pub fn create_metrics_router() -> Router {
         metrics: Arc::new(RwLock::new(Metrics::default())),
     };
     
+    let cors = CorsLayer::new()
+        .allow_origin(Any)
+        .allow_methods([Method::GET, Method::POST])
+        .allow_headers(Any);
+    
     Router::new()
         .route("/metrics", get(metrics_handler))
         .route("/health", get(health_handler))
+        .layer(cors)
         .with_state(metrics_state)
 }
 
