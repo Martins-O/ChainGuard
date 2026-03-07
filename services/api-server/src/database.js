@@ -320,7 +320,8 @@ class Database {
   // Transaction management
   async getTransactions(subnetId, limit = 100, offset = 0, filters = {}) {
     try {
-      const query = { 'subnet.subnetId': new ObjectId(subnetId) };
+      // Query by string subnetId (stored as string in transactions collection)
+      const query = { 'subnet.subnetId': subnetId };
 
       if (filters.fromAddress) query.fromAddress = filters.fromAddress;
       if (filters.toAddress) query.toAddress = filters.toAddress;
@@ -359,7 +360,8 @@ class Database {
   // Alert management
   async getAlerts(subnetId, limit = 100, offset = 0, filters = {}) {
     try {
-      const query = { 'subnet.subnetId': new ObjectId(subnetId) };
+      // Query by string subnetId
+      const query = { 'subnet.subnetId': subnetId };
 
       if (filters.threatLevel) query.threatLevel = filters.threatLevel;
       if (filters.acknowledged !== undefined) query.acknowledged = filters.acknowledged;
