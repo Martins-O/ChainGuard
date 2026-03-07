@@ -13,11 +13,11 @@ const subnetValidation = [
     .matches(/^(0x)?[a-zA-Z0-9]+$/)
     .withMessage('Chain ID must contain only alphanumeric characters'),
   body('rpcUrl')
-    .isURL()
-    .withMessage('RPC URL must be a valid URL'),
+    .isURL({ protocols: ['http', 'https'] })
+    .withMessage('RPC URL must be a valid HTTP/HTTPS URL (e.g., https://api.avax.network/ext/bc/C/rpc)'),
   body('websocketUrl')
-    .isURL()
-    .withMessage('WebSocket URL must be a valid URL'),
+    .isURL({ protocols: ['ws', 'wss'] })
+    .withMessage('WebSocket URL must be a valid WebSocket URL (e.g., wss://api.avax.network/ext/bc/C/ws)'),
   body('description')
     .optional()
     .trim()
@@ -33,12 +33,12 @@ const subnetUpdateValidation = [
     .withMessage('Name must be between 1 and 255 characters'),
   body('rpcUrl')
     .optional()
-    .isURL()
-    .withMessage('RPC URL must be a valid URL'),
+    .isURL({ protocols: ['http', 'https'] })
+    .withMessage('RPC URL must be a valid HTTP/HTTPS URL'),
   body('websocketUrl')
     .optional()
-    .isURL()
-    .withMessage('WebSocket URL must be a valid URL'),
+    .isURL({ protocols: ['ws', 'wss'] })
+    .withMessage('WebSocket URL must be a valid WebSocket URL'),
   body('description')
     .optional()
     .trim()
@@ -89,11 +89,12 @@ const registerValidation = [
 const handleValidationErrors = (req, res, next) => {
   const errors = validationResult(req);
   if (!errors.isEmpty()) {
+    const errorList = errors.array();
     return res.status(400).json({
       success: false,
-      error: 'Validation failed',
-      details: errors.array().map(error => ({
-        field: error.param,
+      error: errorList[0].msg,
+      details: errorList.map(error => ({
+        field: error.path,
         message: error.msg,
         value: error.value
       }))

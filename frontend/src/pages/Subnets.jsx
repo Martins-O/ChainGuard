@@ -220,7 +220,13 @@ const CreateSubnetModal = ({ onClose, onSuccess }) => {
       toast.success('Subnet created successfully')
       onSuccess()
     } catch (error) {
-      toast.error(error.error || 'Failed to create subnet')
+      console.error('Subnet creation error:', error)
+      if (error.details && Array.isArray(error.details) && error.details.length > 0) {
+        const firstError = error.details[0]
+        toast.error(`${firstError.message}`)
+      } else {
+        toast.error(error.error || 'Failed to create subnet')
+      }
     } finally {
       setLoading(false)
     }
