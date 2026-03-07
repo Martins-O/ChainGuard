@@ -69,6 +69,21 @@ class Database:
                 IndexModel([('createdAt', DESCENDING)])
             ])
 
+            # Transactions indexes
+            await self.db.transactions.create_indexes([
+                IndexModel([('txHash', ASCENDING)], unique=True),
+                IndexModel([('subnet.subnetId', ASCENDING)]),
+                IndexModel([('fromAddress', ASCENDING)]),
+                IndexModel([('toAddress', ASCENDING)]),
+                IndexModel([('createdAt', DESCENDING)])
+            ])
+            
+            # Subnets indexes
+            await self.db.subnets.create_indexes([
+                IndexModel([('chainId', ASCENDING)]),
+                IndexModel([('isActive', ASCENDING)])
+            ])
+
             # Feature store indexes (for ML retraining)
             await self.db.feature_store.create_indexes([
                 IndexModel([('txHash', ASCENDING)]),
@@ -105,6 +120,74 @@ class Database:
         except Exception as e:
             logger.error(f"Error saving threat analysis: {e}")
             raise
+
+    async def save_transaction(self, tx_data: Dict[str, Any], subnet_id: str) -> str:
+        """
+        Save transaction to MongoDB
+
+        Args:
+            tx_data: Transaction data dictionary
+            subnet_id: MongoDB ObjectId of the subnet
+
+        Returns:
+            str: Inserted document ID
+        """
+        self._check_connection()
+
+        try:
+            # Format transaction for storage
+            tx_doc = {
+                'txHash': tx_data.get('hash', ''),
+                'fromAddress': tx_data.get('from', ''),
+                'toAddress': tx_data.get('to', ''),
+                'value': tx_data.get('value', '0'),
+                'gasLimit': tx_data.get('gas', '0'),
+                'gasPrice': tx_data.get('gasPrice', '0'),
+                'input': tx_data.get('input', '0x'),
+                'nonce': tx_data.get('nonce', 0),
+                'chainId': tx_data.get('chainId', ''),
+                'blockNumber': tx_data.get('blockNumber'),
+                'status': tx_data.get('status', False),
+                'subnet': {
+                    'subnetId': subnet_id
+                },
+                'createdAt': datetime.now(timezone.utc)
+            }
+
+            result = await self.db.transactions.insert_one(tx_doc)
+            logger.info(f"Saved transaction: {tx_doc.get('txHash')}")
+            return str(result.inserted_id)
+
+        except Exception as e:
+            # Ignore duplicate key errors (transaction already exists)
+            if 'duplicate key' in str(e).lower():
+                logger.debug(f"Transaction already exists: {tx_data.get('hash')}")
+                return None
+            logger.error(f"Error saving transaction: {e}")
+            raise
+
+    async def get_subnet_by_chain_id(self, chain_id: str) -> Optional[Dict[str, Any]]:
+        """
+        Get subnet by chain ID
+
+        Args:
+            chain_id: The blockchain chain ID
+
+        Returns:
+            Dict or None: Subnet document
+        """
+        self._check_connection()
+
+        try:
+            subnet = await self.db.subnets.find_one({
+                'chainId': chain_id,
+                'isActive': True
+            })
+            return subnet
+
+        except Exception as e:
+            logger.error(f"Error getting subnet by chain ID: {e}")
+            return None
 
     async def get_analysis_by_hash(self, tx_hash: str) -> Optional[Dict[str, Any]]:
         """

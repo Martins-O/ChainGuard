@@ -181,6 +181,15 @@ class AIThreatAnalyzer:
 
             # Save to MongoDB
             await self._save_analysis(analysis, features)
+            
+            # Save transaction to database
+            chain_id = transaction_data.get('chainId', '')
+            if chain_id:
+                # Get subnet ID from chain_id
+                subnet = await self.db.get_subnet_by_chain_id(chain_id)
+                if subnet:
+                    subnet_id = str(subnet.get('_id', ''))
+                    await self.db.save_transaction(transaction_data, subnet_id)
 
             # Save features to feature store for retraining
             await self.db.save_features(
