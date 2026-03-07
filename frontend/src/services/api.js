@@ -3,6 +3,7 @@ import axios from 'axios'
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000'
 const AI_ENGINE_URL = import.meta.env.VITE_AI_ENGINE_URL || 'http://localhost:8000'
 const ALERT_SERVICE_URL = import.meta.env.VITE_ALERT_SERVICE_URL || 'http://localhost:3001'
+const INGESTION_URL = import.meta.env.VITE_INGESTION_URL || 'http://localhost:9000'
 
 // Create axios instance
 const api = axios.create({
@@ -24,6 +25,12 @@ const alertApi = axios.create({
   headers: { 'Content-Type': 'application/json' },
 })
 
+// Ingestion Service client
+const ingestionApi = axios.create({
+  baseURL: INGESTION_URL,
+  headers: { 'Content-Type': 'application/json' },
+})
+
 // Attach auth token to all clients
 const addAuthInterceptor = (client) => {
   client.interceptors.request.use(
@@ -37,12 +44,31 @@ const addAuthInterceptor = (client) => {
   client.interceptors.response.use(
     (response) => response.data,
     (error) => {
+      const errorData = error.response?.data
+      
       if (error.response?.status === 401) {
         localStorage.removeItem('token')
         localStorage.removeItem('user')
         window.location.href = '/login'
       }
-      return Promise.reject(error.response?.data || error)
+      
+      let errorMessage = 'An error occurred'
+      
+      if (errorData) {
+        if (errorData.error) {
+          errorMessage = errorData.error
+        } else if (errorData.message) {
+          errorMessage = errorData.message
+        } else if (errorData.details && Array.isArray(errorData.details)) {
+          errorMessage = errorData.details.map(d => d.message).join(', ')
+        }
+      } else if (error.code === 'ERR_NETWORK') {
+        errorMessage = 'Network error. Please check your connection.'
+      } else if (error.code === 'ECONNABORTED') {
+        errorMessage = 'Request timeout. Please try again.'
+      }
+      
+      return Promise.reject({ ...errorData, error: errorMessage, status: error.response?.status })
     }
   )
 }
@@ -50,6 +76,7 @@ const addAuthInterceptor = (client) => {
 addAuthInterceptor(api)
 addAuthInterceptor(aiApi)
 addAuthInterceptor(alertApi)
+addAuthInterceptor(ingestionApi)
 
 // Auth API
 export const authAPI = {
@@ -141,6 +168,15 @@ export const alertServiceAPI = {
 
   health: () =>
     alertApi.get('/health'),
+}
+
+// Ingestion Service API
+export const ingestionAPI = {
+  health: () =>
+    ingestionApi.get('/health'),
+  
+  metrics: () =>
+    ingestionApi.get('/metrics'),
 }
 
 export default api

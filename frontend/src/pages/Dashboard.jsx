@@ -13,6 +13,7 @@ import {
 } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { formatDistanceToNow } from 'date-fns'
+import ServiceStatus from '../components/ServiceStatus'
 
 const Dashboard = () => {
   const [stats, setStats] = useState({
@@ -179,6 +180,9 @@ const Dashboard = () => {
           </div>
         </div>
       </div>
+
+      {/* Service Status */}
+      <ServiceStatus />
 
       {/* Recent Alerts */}
       <div className="card">
