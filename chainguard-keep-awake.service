@@ -1,0 +1,13 @@
+[Unit]
+Description=ChainGuard Keep-Awake Service
+After=network.target
+
+[Service]
+Type=simple
+User=martins
+ExecStart=/home/martins/hacks/chainGuard/keep-awake.sh 300
+Restart=always
+RestartSec=10
+
+[Install]
+WantedBy=multi-user.target

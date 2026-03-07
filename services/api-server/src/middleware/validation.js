@@ -10,7 +10,7 @@ const subnetValidation = [
     .withMessage('Name must be between 1 and 255 characters'),
   body('chainId')
     .trim()
-    .matches(/^[a-zA-Z0-9]+$/)
+    .matches(/^(0x)?[a-zA-Z0-9]+$/)
     .withMessage('Chain ID must contain only alphanumeric characters'),
   body('rpcUrl')
     .isURL()

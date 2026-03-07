@@ -209,7 +209,14 @@ const CreateSubnetModal = ({ onClose, onSuccess }) => {
     setLoading(true)
 
     try {
-      await subnetsAPI.create(formData)
+      const trimmedData = {
+        name: formData.name.trim(),
+        chainId: formData.chainId.trim(),
+        rpcUrl: formData.rpcUrl.trim(),
+        websocketUrl: formData.websocketUrl.trim(),
+        description: formData.description.trim()
+      }
+      await subnetsAPI.create(trimmedData)
       toast.success('Subnet created successfully')
       onSuccess()
     } catch (error) {

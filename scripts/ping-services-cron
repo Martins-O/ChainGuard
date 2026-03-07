@@ -1,0 +1,4 @@
+# ChainGuard Keep-Awake Cron Job
+# Add to crontab with: crontab -e
+# Run every 5 minutes to keep Render services awake
+*/5 * * * * /home/martins/hacks/chainGuard/scripts/ping-services.sh >> /home/martins/hacks/chainGuard/logs/keep-awake.log 2>&1

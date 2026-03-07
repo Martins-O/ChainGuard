@@ -21,18 +21,25 @@ export const AuthProvider = ({ children }) => {
       const storedToken = localStorage.getItem('token')
       const storedUser = localStorage.getItem('user')
       
+      console.log('Initializing auth - storedToken:', !!storedToken, 'storedUser:', !!storedUser)
+      
       if (storedToken && storedUser) {
         try {
-          // Verify token is still valid
+          console.log('Verifying token...')
           const response = await authAPI.verify(storedToken)
-          if (response.success) {
+          console.log('Verify response:', response)
+          
+          if (response && response.success) {
             setToken(storedToken)
             setUser(JSON.parse(storedUser))
+            console.log('Auth initialized successfully')
           } else {
+            console.log('Verify returned success: false')
             localStorage.removeItem('token')
             localStorage.removeItem('user')
           }
         } catch (error) {
+          console.error('Auth verification failed:', error)
           localStorage.removeItem('token')
           localStorage.removeItem('user')
         }
