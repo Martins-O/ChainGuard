@@ -16,12 +16,13 @@ router.post('/',
       const { name, chainId, rpcUrl, websocketUrl, description } = req.body;
 
       const existingSubnets = await db.getSubnets(1000, 0);
-      const duplicate = existingSubnets.find(s => s.chain_id === chainId);
+      const chainIdStr = String(chainId);
+      const duplicate = existingSubnets.find(s => String(s.chain_id) === chainIdStr);
       
       if (duplicate) {
         return res.status(409).json({
           success: false,
-          error: 'A subnet with this Chain ID already exists. Please use a different Chain ID.'
+          error: `A subnet with Chain ID '${chainId}' already exists. Please use a different Chain ID.`
         });
       }
 
