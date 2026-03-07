@@ -58,7 +58,8 @@ const Subnets = () => {
       toast.success('Subnet deleted')
       loadSubnets()
     } catch (error) {
-      toast.error('Failed to delete subnet')
+      console.error('Delete subnet error:', error)
+      toast.error(error.error || 'Failed to delete subnet. Admin access required.')
     }
   }
 
