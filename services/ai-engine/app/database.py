@@ -96,7 +96,7 @@ class Database:
         except Exception as e:
             logger.warning(f"Error creating indexes: {e}")
 
-    async def save_threat_analysis(self, analysis_dict: Dict[str, Any]) -> str:
+    async def save_threat_analysis(self, analysis_dict: Dict[str, Any]) -> Optional[str]:
         """
         Save threat analysis to MongoDB
 
@@ -113,15 +113,25 @@ class Database:
             analysis_dict['createdAt'] = datetime.now(timezone.utc)
             analysis_dict['updatedAt'] = datetime.now(timezone.utc)
 
-            result = await self.db.threat_analyses.insert_one(analysis_dict)
+            # Skip if tx_hash is null or empty
+            if not analysis_dict.get('txHash') or analysis_dict.get('txHash') == 'null':
+                logger.warning("Skipping analysis save - no valid txHash")
+                return None
+
+            # Use upsert to handle duplicate key errors
+            result = await self.db.threat_analyses.update_one(
+                {'txHash': analysis_dict['txHash']},
+                {'$set': analysis_dict},
+                upsert=True
+            )
             logger.info(f"Saved threat analysis for tx: {analysis_dict.get('txHash')}")
-            return str(result.inserted_id)
+            return str(result.upserted_id) if result.upserted_id else "updated"
 
         except Exception as e:
             logger.error(f"Error saving threat analysis: {e}")
             raise
 
-    async def save_transaction(self, tx_data: Dict[str, Any], subnet_id: str) -> str:
+    async def save_transaction(self, tx_data: Dict[str, Any], subnet_id: str) -> Optional[str]:
         """
         Save transaction to MongoDB
 
