@@ -115,6 +115,15 @@ class AIThreatAnalyzer:
             new_key = field_mapping.get(key, key)
             normalized[new_key] = value
         
+        # Convert chainId from hex to decimal if needed
+        if 'chainId' in normalized and normalized['chainId']:
+            chain_id = normalized['chainId']
+            if isinstance(chain_id, str) and chain_id.startswith('0x'):
+                try:
+                    normalized['chainId'] = str(int(chain_id, 16))
+                except:
+                    pass
+        
         return normalized
 
     async def analyze_transaction(self, transaction_data: Dict[str, Any]) -> ThreatAnalysis:
