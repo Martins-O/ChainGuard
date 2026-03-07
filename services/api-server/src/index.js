@@ -14,9 +14,6 @@ const limits = require('./middleware/rateLimiting');
 // Import routes
 const authRoutes = require('./routes/auth');
 const subnetRoutes = require('./routes/subnets');
-const transactionRoutes = require('./routes/transactions');
-const alertRoutes = require('./routes/alerts');
-const statsRoutes = require('./routes/stats');
 
 // Configure logging
 const logger = winston.createLogger({
@@ -100,9 +97,6 @@ try {
 // API routes
 app.use('/auth', authRoutes);
 app.use('/subnets', subnetRoutes);
-app.use('/transactions', transactionRoutes);
-app.use('/alerts', alertRoutes);
-app.use('/stats', statsRoutes);
 
 // Root endpoint
 app.get('/', (req, res) => {
