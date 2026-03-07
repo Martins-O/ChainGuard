@@ -130,6 +130,12 @@ class AIThreatAnalyzer:
         """
         try:
             tx_hash = transaction_data.get('hash', '')
+            
+            # Skip if no valid transaction hash
+            if not tx_hash or tx_hash == 'null':
+                logger.warning("Skipping transaction with no valid hash")
+                return None
+            
             logger.debug(f"Analyzing transaction {tx_hash}")
 
             # Extract features (26 features)
@@ -217,12 +223,13 @@ class AIThreatAnalyzer:
 
                     # Analyze transaction
                     analysis = await self.analyze_transaction(transaction_data)
-
-                    logger.info(
-                        f"Processed {analysis.tx_hash}: "
-                        f"Score={analysis.final_score:.1f}, "
-                        f"Level={analysis.threat_level.value}"
-                    )
+                    
+                    if analysis:
+                        logger.info(
+                            f"Processed {analysis.tx_hash}: "
+                            f"Score={analysis.final_score:.1f}, "
+                            f"Level={analysis.threat_level.value}"
+                        )
 
             except Exception as e:
                 logger.error(f"Error processing transaction queue: {e}")
