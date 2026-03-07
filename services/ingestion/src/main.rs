@@ -8,7 +8,6 @@ mod ingestion_service;
 mod subnet_repository;
 
 use anyhow::Result;
-use axum::{Router, routing::get};
 use clap::Parser;
 use std::net::SocketAddr;
 use tokio::signal;
@@ -47,7 +46,7 @@ async fn main() -> Result<()> {
     let mut ingestion_service = IngestionService::new(config.clone())?;
     
     // Create metrics server
-    let metrics_state = MetricsState {
+    let _metrics_state = MetricsState {
         metrics: ingestion_service.get_metrics(),
     };
     
